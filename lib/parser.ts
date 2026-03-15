@@ -54,7 +54,7 @@ function tryParseAthlete(line: string): ParsedAthlete | null {
   if (!rankMatch) return null;
 
   // Extract all x.xxx decimal numbers
-  const decMatches = [...line.matchAll(/\b(\d+\.\d{3})\b/g)];
+  const decMatches = [...line.matchAll(/(\d+\.\d{3})/g)];
   if (decMatches.length < 17) return null;
   const allDecimals = decMatches.map((m) => parseFloat(m[1]));
   const sc = allDecimals.slice(-17);

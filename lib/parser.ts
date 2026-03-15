@@ -50,7 +50,7 @@ export function parseResultsText(text: string): ParsedCategory[] {
 }
 
 function tryParseAthlete(line: string): ParsedAthlete | null {
-  const rankMatch = line.match(/^(\d+)\.\s+/);
+  const rankMatch = line.match(/^(\d+)\.\s*/);
   if (!rankMatch) return null;
 
   // Extract all x.xxx decimal numbers

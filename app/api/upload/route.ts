@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   const categories = parseResultsText(text);
   if (categories.length === 0) {
-    return NextResponse.json({ error: "Žádné výsledky nenalezeny v PDF." }, { status: 422 });
+    return NextResponse.json({ error: "Žádné výsledky nenalezeny v PDF.", debug: { textLength: text.length, firstChars: text.substring(0, 300) } }, { status: 422 });
   }
 
   // Store competition

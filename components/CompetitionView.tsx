@@ -48,10 +48,12 @@ export default function CompetitionView({ competition, categories }: Props) {
   }, [catData]);
 
   const clubs = useMemo(() => [...new Set(ranked.map(a => a.club).filter(Boolean))].sort(), [ranked]);
+  const names = useMemo(() => [...new Set(ranked.map(a => a.name).filter(Boolean))].sort(), [ranked]);
+  const coaches = useMemo(() => [...new Set(ranked.flatMap(a => a.coach ? a.coach.split(/[,;]/).map(s => s.trim()) : []).filter(Boolean))].sort(), [ranked]);
 
   const filtered = useMemo(() => {
     let result = ranked;
-    if (clubFilter) result = result.filter(a => a.club === clubFilter);
+    if (clubFilter) result = result.filter(a => a.club.toLowerCase().includes(clubFilter.toLowerCase()));
     if (nameFilter) result = result.filter(a => a.name.toLowerCase().includes(nameFilter.toLowerCase()));
     if (coachFilter) result = result.filter(a => a.coach.toLowerCase().includes(coachFilter.toLowerCase()));
     return result;
@@ -86,29 +88,31 @@ export default function CompetitionView({ competition, categories }: Props) {
         {/* Club filter */}
         <div className="p-3 border-b border-gray-200">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Oddíl</p>
-          <select value={clubFilter} onChange={e => { setClubFilter(e.target.value); setSelectedAthlete(null); }}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <option value="">— Všechny oddíly —</option>
-            {clubs.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <input type="text" value={clubFilter} list="list-clubs"
+            onChange={e => { setClubFilter(e.target.value); setSelectedAthlete(null); }}
+            placeholder="Hledat oddíl…"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          <datalist id="list-clubs">{clubs.map(c => <option key={c} value={c} />)}</datalist>
         </div>
 
         {/* Name filter */}
         <div className="p-3 border-b border-gray-200">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Závodník</p>
-          <input type="text" value={nameFilter}
+          <input type="text" value={nameFilter} list="list-names"
             onChange={e => { setNameFilter(e.target.value); setSelectedAthlete(null); }}
             placeholder="Hledat jméno…"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          <datalist id="list-names">{names.map(n => <option key={n} value={n} />)}</datalist>
         </div>
 
         {/* Coach filter */}
         <div className="p-3 border-b border-gray-200">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Trenér</p>
-          <input type="text" value={coachFilter}
+          <input type="text" value={coachFilter} list="list-coaches"
             onChange={e => { setCoachFilter(e.target.value); setSelectedAthlete(null); }}
             placeholder="Hledat trenéra…"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          <datalist id="list-coaches">{coaches.map(c => <option key={c} value={c} />)}</datalist>
         </div>
       </aside>
 

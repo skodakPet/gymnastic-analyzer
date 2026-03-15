@@ -35,10 +35,18 @@ function rankPill(rank: number, total: number) {
 
 export default function CompetitionView({ competition, categories }: Props) {
   const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "");
+  const [clubInput, setClubInput] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [coachInput, setCoachInput] = useState("");
   const [clubFilter, setClubFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const [coachFilter, setCoachFilter] = useState("");
   const [selectedAthlete, setSelectedAthlete] = useState<string | null>(null);
+
+  function applyFilters() { setClubFilter(clubInput); setNameFilter(nameInput); setCoachFilter(coachInput); setSelectedAthlete(null); }
+  function resetFilters() { setClubInput(""); setNameInput(""); setCoachInput(""); setClubFilter(""); setNameFilter(""); setCoachFilter(""); setSelectedAthlete(null); }
+  const hasActiveFilter = clubFilter || nameFilter || coachFilter;
+  const hasPendingChange = clubInput !== clubFilter || nameInput !== nameFilter || coachInput !== coachFilter;
 
   const catData = categories.find(c => c.id === activeCat);
 
@@ -77,7 +85,7 @@ export default function CompetitionView({ competition, categories }: Props) {
         <div className="p-3 border-b border-gray-200">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Kategorie</p>
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => { setActiveCat(cat.id); setSelectedAthlete(null); setClubFilter(""); setNameFilter(""); setCoachFilter(""); }}
+            <button key={cat.id} onClick={() => { setActiveCat(cat.id); resetFilters(); }}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between mb-0.5 ${activeCat === cat.id ? "bg-[#1a3a5c] text-white font-semibold" : "hover:bg-gray-50 text-gray-700"}`}>
               <span>{cat.name}</span>
               <span className={`text-xs ${activeCat === cat.id ? "opacity-60" : "text-gray-400"}`}>{cat.results.length}</span>
@@ -85,34 +93,47 @@ export default function CompetitionView({ competition, categories }: Props) {
           ))}
         </div>
 
-        {/* Club filter */}
-        <div className="p-3 border-b border-gray-200">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Oddíl</p>
-          <input type="text" value={clubFilter} list="list-clubs"
-            onChange={e => { setClubFilter(e.target.value); setSelectedAthlete(null); }}
-            placeholder="Hledat oddíl…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          <datalist id="list-clubs">{clubs.map(c => <option key={c} value={c} />)}</datalist>
-        </div>
-
-        {/* Name filter */}
-        <div className="p-3 border-b border-gray-200">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Závodník</p>
-          <input type="text" value={nameFilter} list="list-names"
-            onChange={e => { setNameFilter(e.target.value); setSelectedAthlete(null); }}
-            placeholder="Hledat jméno…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          <datalist id="list-names">{names.map(n => <option key={n} value={n} />)}</datalist>
-        </div>
-
-        {/* Coach filter */}
-        <div className="p-3 border-b border-gray-200">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Trenér</p>
-          <input type="text" value={coachFilter} list="list-coaches"
-            onChange={e => { setCoachFilter(e.target.value); setSelectedAthlete(null); }}
-            placeholder="Hledat trenéra…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          <datalist id="list-coaches">{coaches.map(c => <option key={c} value={c} />)}</datalist>
+        {/* Filters */}
+        <div className="p-3 border-b border-gray-200 space-y-3">
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Oddíl</p>
+            <input type="text" value={clubInput} list="list-clubs"
+              onChange={e => setClubInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && applyFilters()}
+              placeholder="Hledat oddíl…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <datalist id="list-clubs">{clubs.map(c => <option key={c} value={c} />)}</datalist>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Závodník</p>
+            <input type="text" value={nameInput} list="list-names"
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && applyFilters()}
+              placeholder="Hledat jméno…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <datalist id="list-names">{names.map(n => <option key={n} value={n} />)}</datalist>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Trenér</p>
+            <input type="text" value={coachInput} list="list-coaches"
+              onChange={e => setCoachInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && applyFilters()}
+              placeholder="Hledat trenéra…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <datalist id="list-coaches">{coaches.map(c => <option key={c} value={c} />)}</datalist>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={applyFilters}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${hasPendingChange ? "bg-[#1a3a5c] text-white hover:bg-[#14304e]" : "bg-gray-100 text-gray-400 cursor-default"}`}>
+              Filtrovat
+            </button>
+            {hasActiveFilter && (
+              <button onClick={resetFilters}
+                className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors">
+                Zrušit
+              </button>
+            )}
+          </div>
         </div>
       </aside>
 

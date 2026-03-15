@@ -123,6 +123,9 @@ function tryParseAthlete(line: string): ParsedAthlete | null {
   };
 }
 
+// Clubs whose prefix IS the full club name (no city suffix appended)
+const FULL_CLUB_NAMES = new Set(["BubbleGym", "GYMPRA"]);
+
 function splitClubCoach(text: string): { club: string; coach: string } {
   const prefixes = [
     "T.J. Sokol", "TJ Sokol", "T.J.", "TJ ", "SK ", "SG ", "SGC ",
@@ -130,15 +133,31 @@ function splitClubCoach(text: string): { club: string; coach: string } {
   ];
   for (const p of prefixes) {
     if (text.startsWith(p)) {
-      const rest = text.substring(p.length);
-      const m = rest.match(/^(\S+(?:\s+\S+){0,2})\s{2,}(.+)$/);
-      if (m) return { club: (p + m[1]).trim(), coach: m[2].trim() };
-      const words = text.split(/\s+/);
+      const clubBase = p.trim();
+      const rest = text.substring(p.length).trim();
+
+      // Complete club names have no city suffix — rest is the coach directly
+      if (FULL_CLUB_NAMES.has(clubBase)) {
+        return { club: clubBase, coach: rest };
+      }
+
+      // PDF concatenates city and coach without spaces, e.g. "DoksyDoubravová"
+      // Split at first adjacent lowercase→uppercase transition (camelCase boundary)
+      const camel = rest.match(/^(.*?\p{Ll})(\p{Lu}.*)$/su);
+      if (camel) {
+        return { club: (clubBase + " " + camel[1]).trim(), coach: camel[2].trim() };
+      }
+
+      // Fallback for space-separated text (e.g. multi-line merged entries)
+      const words = rest.split(/\s+/);
       return {
-        club: words.slice(0, Math.min(4, words.length)).join(" "),
+        club: (clubBase + " " + words.slice(0, 4).join(" ")).trim(),
         coach: words.slice(4).join(" "),
       };
     }
   }
+  // No known prefix: try camelCase split on full text
+  const camel = text.match(/^(.*?\p{Ll})(\p{Lu}.*)$/su);
+  if (camel) return { club: camel[1].trim(), coach: camel[2].trim() };
   return { club: text, coach: "" };
 }

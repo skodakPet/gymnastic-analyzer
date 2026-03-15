@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { calcRankings, generateFeedback } from "@/lib/analytics";
 import type { RankedAthlete, Result } from "@/lib/types";
 import { DISC_NAMES } from "@/lib/types";
@@ -22,6 +22,34 @@ function resultToAthlete(r: Result) {
     ] as [any,any,any,any],
     celkem: r.celkem,
   };
+}
+
+function AutocompleteInput({ value, onChange, options, placeholder, onEnter }: {
+  value: string; onChange: (v: string) => void; options: string[];
+  placeholder: string; onEnter: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const suggestions = options.filter(o => value && o.toLowerCase().includes(value.toLowerCase()) && o !== value);
+  return (
+    <div ref={containerRef} className="relative">
+      <input type="text" value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onKeyDown={e => { if (e.key === "Enter") { setOpen(false); onEnter(); } if (e.key === "Escape") setOpen(false); }}
+        placeholder={placeholder}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-20 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto">
+          {suggestions.slice(0, 25).map(o => (
+            <li key={o} onMouseDown={() => { onChange(o); setOpen(false); }}
+              className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 truncate">{o}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function medal(r: number) { return r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : ""; }
@@ -97,30 +125,15 @@ export default function CompetitionView({ competition, categories }: Props) {
         <div className="p-3 border-b border-gray-200 space-y-3">
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Oddíl</p>
-            <input type="text" value={clubInput} list="list-clubs"
-              onChange={e => setClubInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && applyFilters()}
-              placeholder="Hledat oddíl…"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <datalist id="list-clubs">{clubs.map(c => <option key={c} value={c} />)}</datalist>
+            <AutocompleteInput value={clubInput} onChange={setClubInput} options={clubs} placeholder="Hledat oddíl…" onEnter={applyFilters} />
           </div>
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Závodník</p>
-            <input type="text" value={nameInput} list="list-names"
-              onChange={e => setNameInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && applyFilters()}
-              placeholder="Hledat jméno…"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <datalist id="list-names">{names.map(n => <option key={n} value={n} />)}</datalist>
+            <AutocompleteInput value={nameInput} onChange={setNameInput} options={names} placeholder="Hledat jméno…" onEnter={applyFilters} />
           </div>
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Trenér</p>
-            <input type="text" value={coachInput} list="list-coaches"
-              onChange={e => setCoachInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && applyFilters()}
-              placeholder="Hledat trenéra…"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <datalist id="list-coaches">{coaches.map(c => <option key={c} value={c} />)}</datalist>
+            <AutocompleteInput value={coachInput} onChange={setCoachInput} options={coaches} placeholder="Hledat trenéra…" onEnter={applyFilters} />
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={applyFilters}

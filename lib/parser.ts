@@ -3,6 +3,13 @@ import type { ParsedAthlete, ParsedCategory, Discipline } from "./types";
 /**
  * Parses raw text (from pdf-parse) into categories + athletes.
  * Handles the standard Czech gymnastics result sheet format.
+ *
+ * NOTE: pdf-parse concatenates numbers without spaces, e.g. "2.0008.6500.00010.650"
+ * — all regexes avoid word boundaries (\b) to handle this.
+ *
+ * Formats supported:
+ *   - 4 disciplines (přeskok + bradla + kladina + prostná): 17 decimal values
+ *   - 3 disciplines (bradla + kladina + prostná, VS3C/VS4B): 13 decimal values
  */
 export function parseResultsText(text: string): ParsedCategory[] {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -11,8 +18,8 @@ export function parseResultsText(text: string): ParsedCategory[] {
   let pendingLine: string | null = null;
 
   for (const line of lines) {
-    // Category header: "II. kategorie", "III. kategorie", etc.
-    if (/^(I{1,3}V?|IV|V{0,1}I{0,3})\.?\s*kategorie/i.test(line)) {
+    // Category header: Roman numeral + "kategorie" (with optional suffix like "- VS3C")
+    if (/^(I{1,3}|IV|VI{0,3}|V)\.?\s+kategorie/i.test(line)) {
       currentCat = { name: line.replace(/\s+/g, " ").trim(), athletes: [] };
       categories.push(currentCat);
       pendingLine = null;
@@ -20,29 +27,24 @@ export function parseResultsText(text: string): ParsedCategory[] {
     }
     if (!currentCat) continue;
 
-    // Skip header rows and page footers
-    if (/Jméno|Ročník|přeskok|bradla|kladina|prostná/i.test(line) && !/^\d+\./.test(line)) continue;
-    if (/^\s*(strana|\d+\s*\/\s*\d+)/i.test(line)) continue;
-
-    // Continuation of a multi-line entry (club on second line)
-    if (pendingLine && !/^\d+\./.test(line)) {
-      const merged = pendingLine + " " + line;
-      const athlete = tryParseAthlete(merged);
-      if (athlete) {
-        currentCat.athletes.push(athlete);
-        pendingLine = null;
-      }
-      continue;
-    }
+    // Skip column headers and page markers
+    if (/přeskok|bradla|kladina|prostná/i.test(line) && !/^\d+\./.test(line)) continue;
+    if (/strana|\d+\s*\/\s*\d+/i.test(line) && !/^\d+\./.test(line)) continue;
 
     if (/^\d+\./.test(line)) {
+      // New athlete line — discard any unresolved pending
+      pendingLine = null;
       const athlete = tryParseAthlete(line);
       if (athlete) {
         currentCat.athletes.push(athlete);
-        pendingLine = null;
       } else {
-        pendingLine = line; // might need next line to complete
+        pendingLine = line; // may need next line (e.g. multi-line club name)
       }
+    } else if (pendingLine) {
+      // Continuation line — merge and retry
+      const athlete = tryParseAthlete(pendingLine + " " + line);
+      if (athlete) currentCat.athletes.push(athlete);
+      pendingLine = null;
     }
   }
 
@@ -50,50 +52,82 @@ export function parseResultsText(text: string): ParsedCategory[] {
 }
 
 function tryParseAthlete(line: string): ParsedAthlete | null {
-  const rankMatch = line.match(/^(\d+)\.\s*/);
+  // Must start with rank number followed by period
+  const rankMatch = line.match(/^(\d+)\./);
   if (!rankMatch) return null;
 
-  // Extract all x.xxx decimal numbers
+  // ── Decimal scores ──────────────────────────────────────────────────────────
+  // pdf-parse concatenates numbers → use /(\d+\.\d{3})/g without \b
   const decMatches = [...line.matchAll(/(\d+\.\d{3})/g)];
-  if (decMatches.length < 17) return null;
   const allDecimals = decMatches.map((m) => parseFloat(m[1]));
-  const sc = allDecimals.slice(-17);
 
-  // Validate discipline structure: D+E-pen ≈ total (×4) + celkem
-  const disciplines: Discipline[] = [];
-  for (let i = 0; i < 4; i++) {
-    const D = sc[i * 4], E = sc[i * 4 + 1], pen = sc[i * 4 + 2], tot = sc[i * 4 + 3];
-    if (D > 6 || E > 11 || pen > 5) return null;
-    if (Math.abs(D + E - pen - tot) > 0.02) return null;
-    disciplines.push({ D, E, pen, total: tot });
+  // Determine format by score count
+  // 4-discipline: needs 17 values (4×4 + celkem)
+  // 3-discipline: needs 13 values (3×4 + celkem), přeskok absent
+  let numDisciplines: 3 | 4;
+  if (allDecimals.length >= 17) {
+    numDisciplines = 4;
+  } else if (allDecimals.length >= 13) {
+    numDisciplines = 3;
+  } else {
+    return null;
   }
-  const celkem = sc[16];
 
-  // Year (e.g. 2020)
-  const yearMatch = line.match(/\b(20[12]\d)\b/);
-  if (!yearMatch) return null;
+  const scoreCount = numDisciplines === 4 ? 17 : 13;
+  const sc = allDecimals.slice(-scoreCount);
 
-  const name = line.substring(rankMatch[0].length, line.indexOf(yearMatch[0])).trim();
-  const afterYear = line.substring(line.indexOf(yearMatch[0]) + 4).trim();
+  // ── Disciplines ──────────────────────────────────────────────────────────────
+  const parsedDiscs: Discipline[] = [];
+  for (let i = 0; i < numDisciplines; i++) {
+    const D = sc[i * 4], E = sc[i * 4 + 1], pen = sc[i * 4 + 2], tot = sc[i * 4 + 3];
+    if (D > 10 || E > 12 || pen > 10) return null;
+    if (Math.abs(D + E - pen - tot) > 0.1) return null;
+    parsedDiscs.push({ D, E, pen, total: tot });
+  }
 
-  // Everything before the first score number is club+coach
-  const firstScoreIdx = afterYear.search(/\b\d+\.\d{3}\b/);
-  const clubCoach = firstScoreIdx > 0 ? afterYear.substring(0, firstScoreIdx).trim() : "";
+  // Map to fixed 4-slot tuple: [přeskok, bradla, kladina, prostná]
+  // For 3-discipline format: přeskok slot is zeroed
+  const zero: Discipline = { D: 0, E: 0, pen: 0, total: 0 };
+  const disciplines: [Discipline, Discipline, Discipline, Discipline] =
+    numDisciplines === 4
+      ? [parsedDiscs[0], parsedDiscs[1], parsedDiscs[2], parsedDiscs[3]]
+      : [zero, parsedDiscs[0], parsedDiscs[1], parsedDiscs[2]];
+
+  const celkem = sc[scoreCount - 1];
+
+  // ── Birth year ───────────────────────────────────────────────────────────────
+  // Use lookahead/lookbehind — \b fails between letters and digits ("Anna2020TJ")
+  const yearMatch = line.match(/(?<!\d)((?:19|20)\d{2})(?!\d)/);
+  if (!yearMatch || yearMatch.index === undefined) return null;
+
+  // ── Name ─────────────────────────────────────────────────────────────────────
+  const name = line.substring(rankMatch[0].length, yearMatch.index).trim().replace(/\s+/g, " ");
+  if (!name) return null;
+
+  // ── Club + coach ─────────────────────────────────────────────────────────────
+  const afterYear = line.substring(yearMatch.index + 4).trim();
+  const firstScoreMatch = afterYear.match(/\d+\.\d{3}/);
+  const clubCoach = firstScoreMatch
+    ? afterYear.substring(0, firstScoreMatch.index).trim()
+    : "";
   const { club, coach } = splitClubCoach(clubCoach);
 
   return {
     rank: parseInt(rankMatch[1]),
-    name: name.replace(/\s+/g, " ").trim(),
-    year: parseInt(yearMatch[0]),
+    name,
+    year: parseInt(yearMatch[1]),
     club,
     coach,
-    disciplines: disciplines as [Discipline, Discipline, Discipline, Discipline],
+    disciplines,
     celkem,
   };
 }
 
 function splitClubCoach(text: string): { club: string; coach: string } {
-  const prefixes = ["T.J. Sokol", "TJ Sokol", "T.J.", "TJ ", "SK ", "SG ", "SGC ", "KSG ", "GT ", "Gymnastika ", "GYMPRA", "BubbleGym"];
+  const prefixes = [
+    "T.J. Sokol", "TJ Sokol", "T.J.", "TJ ", "SK ", "SG ", "SGC ",
+    "KSG ", "GT ", "Gymnastika ", "GYMPRA", "BubbleGym",
+  ];
   for (const p of prefixes) {
     if (text.startsWith(p)) {
       const rest = text.substring(p.length);

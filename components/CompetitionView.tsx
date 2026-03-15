@@ -36,6 +36,8 @@ function rankPill(rank: number, total: number) {
 export default function CompetitionView({ competition, categories }: Props) {
   const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "");
   const [clubFilter, setClubFilter] = useState("");
+  const [nameFilter, setNameFilter] = useState("");
+  const [coachFilter, setCoachFilter] = useState("");
   const [selectedAthlete, setSelectedAthlete] = useState<string | null>(null);
 
   const catData = categories.find(c => c.id === activeCat);
@@ -47,10 +49,13 @@ export default function CompetitionView({ competition, categories }: Props) {
 
   const clubs = useMemo(() => [...new Set(ranked.map(a => a.club).filter(Boolean))].sort(), [ranked]);
 
-  const filtered = useMemo(() =>
-    clubFilter ? ranked.filter(a => a.club === clubFilter) : ranked,
-    [ranked, clubFilter]
-  );
+  const filtered = useMemo(() => {
+    let result = ranked;
+    if (clubFilter) result = result.filter(a => a.club === clubFilter);
+    if (nameFilter) result = result.filter(a => a.name.toLowerCase().includes(nameFilter.toLowerCase()));
+    if (coachFilter) result = result.filter(a => a.coach.toLowerCase().includes(coachFilter.toLowerCase()));
+    return result;
+  }, [ranked, clubFilter, nameFilter, coachFilter]);
 
   const athlete = useMemo(() =>
     selectedAthlete ? ranked.find(a => a.name === selectedAthlete) ?? null : null,
@@ -70,7 +75,7 @@ export default function CompetitionView({ competition, categories }: Props) {
         <div className="p-3 border-b border-gray-200">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Kategorie</p>
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => { setActiveCat(cat.id); setSelectedAthlete(null); setClubFilter(""); }}
+            <button key={cat.id} onClick={() => { setActiveCat(cat.id); setSelectedAthlete(null); setClubFilter(""); setNameFilter(""); setCoachFilter(""); }}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between mb-0.5 ${activeCat === cat.id ? "bg-[#1a3a5c] text-white font-semibold" : "hover:bg-gray-50 text-gray-700"}`}>
               <span>{cat.name}</span>
               <span className={`text-xs ${activeCat === cat.id ? "opacity-60" : "text-gray-400"}`}>{cat.results.length}</span>
@@ -88,24 +93,22 @@ export default function CompetitionView({ competition, categories }: Props) {
           </select>
         </div>
 
-        {/* Athlete list */}
-        <div className="flex-1 overflow-y-auto p-2">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">
-            Závodníci <span className="font-normal">({filtered.length}/{ranked.length})</span>
-          </p>
-          {filtered.map(a => (
-            <button key={a.name} onClick={() => setSelectedAthlete(a.name)}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors mb-0.5 text-left ${selectedAthlete === a.name ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-gray-50"}`}>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${a.overallRank === 1 ? "bg-yellow-400 text-yellow-900" : a.overallRank === 2 ? "bg-gray-300 text-gray-700" : a.overallRank === 3 ? "bg-orange-400 text-white" : "bg-gray-100 text-gray-500"}`}>
-                {a.overallRank}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">{a.name}</p>
-                <p className="text-xs text-gray-400 truncate">{a.club || "—"}</p>
-              </div>
-              <span className="text-sm font-bold text-[#1a3a5c] flex-shrink-0">{a.celkem.toFixed(2)}</span>
-            </button>
-          ))}
+        {/* Name filter */}
+        <div className="p-3 border-b border-gray-200">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Závodník</p>
+          <input type="text" value={nameFilter}
+            onChange={e => { setNameFilter(e.target.value); setSelectedAthlete(null); }}
+            placeholder="Hledat jméno…"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        </div>
+
+        {/* Coach filter */}
+        <div className="p-3 border-b border-gray-200">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Trenér</p>
+          <input type="text" value={coachFilter}
+            onChange={e => { setCoachFilter(e.target.value); setSelectedAthlete(null); }}
+            placeholder="Hledat trenéra…"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
         </div>
       </aside>
 

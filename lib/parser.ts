@@ -143,7 +143,7 @@ function splitClubCoach(text: string): { club: string; coach: string } {
 
       // PDF concatenates city and coach without spaces, e.g. "DoksyDoubravová"
       // Split at first adjacent lowercase→uppercase transition (camelCase boundary)
-      const camel = rest.match(/^(.*?\p{Ll})(\p{Lu}.*)$/su);
+      const camel = rest.match(/^(.*?[a-záčďéěíňóřšťúůýž])([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ].*)$/);
       if (camel) {
         return { club: (clubBase + " " + camel[1]).trim(), coach: camel[2].trim() };
       }
@@ -157,7 +157,7 @@ function splitClubCoach(text: string): { club: string; coach: string } {
     }
   }
   // No known prefix: try camelCase split on full text
-  const camel = text.match(/^(.*?\p{Ll})(\p{Lu}.*)$/su);
+  const camel = text.match(/^(.*?[a-záčďéěíňóřšťúůýž])([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ].*)$/);
   if (camel) return { club: camel[1].trim(), coach: camel[2].trim() };
   return { club: text, coach: "" };
 }

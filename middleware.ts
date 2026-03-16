@@ -25,9 +25,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/register");
-  const isProtected = !isAuthPage && !pathname.startsWith("/api/auth");
+  // Public read-only routes — accessible without login
+  const isPublicRead = pathname === "/" || pathname.startsWith("/competitions/");
+  const needsAuth = !isAuthPage && !isPublicRead && !pathname.startsWith("/api/auth");
 
-  if (!user && isProtected) {
+  if (!user && needsAuth) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

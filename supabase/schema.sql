@@ -67,19 +67,19 @@ ALTER TABLE competitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE results      ENABLE ROW LEVEL SECURITY;
 
--- Soutěže: každý přihlášený vidí vše, mazat může jen tvůrce
-CREATE POLICY "competitions_select" ON competitions FOR SELECT TO authenticated USING (true);
+-- Soutěže: čtení pro všechny (host i přihlášený), zápis/mazání jen pro přihlášené
+CREATE POLICY "competitions_select" ON competitions FOR SELECT USING (true);
 CREATE POLICY "competitions_insert" ON competitions FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
 CREATE POLICY "competitions_delete" ON competitions FOR DELETE TO authenticated USING (auth.uid() = created_by);
 
--- Kategorie a výsledky: sdílené napříč přihlášenými uživateli
-CREATE POLICY "categories_select" ON categories FOR SELECT TO authenticated USING (true);
+-- Kategorie a výsledky: čtení pro všechny, zápis/mazání jen pro přihlášené
+CREATE POLICY "categories_select" ON categories FOR SELECT USING (true);
 CREATE POLICY "categories_insert" ON categories FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "categories_delete" ON categories FOR DELETE TO authenticated USING (
   EXISTS (SELECT 1 FROM competitions c WHERE c.id = competition_id AND c.created_by = auth.uid())
 );
 
-CREATE POLICY "results_select" ON results FOR SELECT TO authenticated USING (true);
+CREATE POLICY "results_select" ON results FOR SELECT USING (true);
 CREATE POLICY "results_insert" ON results FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "results_delete" ON results FOR DELETE TO authenticated USING (
   EXISTS (

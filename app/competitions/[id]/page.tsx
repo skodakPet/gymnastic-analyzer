@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import CompetitionView from "@/components/CompetitionView";
 import Link from "next/link";
 import type { Result } from "@/lib/types";
@@ -8,7 +8,6 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: comp } = await supabase
     .from("competitions")
@@ -47,10 +46,16 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
         <span className="text-sm font-medium opacity-80 truncate max-w-xs">{comp.name}</span>
         {comp.date && <span className="text-xs opacity-50 hidden sm:block">{new Date(comp.date).toLocaleDateString("cs-CZ")}</span>}
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm opacity-60">{user.email}</span>
-          <form action="/api/auth/signout" method="POST">
-            <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md">Odhlásit</button>
-          </form>
+          {user ? (
+            <>
+              <span className="text-sm opacity-60">{user.email}</span>
+              <form action="/api/auth/signout" method="POST">
+                <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md">Odhlásit</button>
+              </form>
+            </>
+          ) : (
+            <Link href="/login" className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md">Přihlásit</Link>
+          )}
         </div>
       </header>
 

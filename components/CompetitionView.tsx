@@ -10,6 +10,10 @@ interface Props {
   categories: CategoryData[];
 }
 
+type FilterField = "club" | "name" | "coach";
+interface FilterChip { field: FilterField; value: string; label: string; }
+const FIELD_LABELS: Record<FilterField, string> = { club: "Oddíl", name: "Závodník", coach: "Trenér" };
+
 function resultToAthlete(r: Result) {
   return {
     rank: r.rank, name: r.name, year: r.birth_year ?? 0,
@@ -24,26 +28,26 @@ function resultToAthlete(r: Result) {
   };
 }
 
-function AutocompleteInput({ value, onChange, options, placeholder, onEnter }: {
+function AutocompleteInput({ value, onChange, options, placeholder, onSelect }: {
   value: string; onChange: (v: string) => void; options: string[];
-  placeholder: string; onEnter: () => void;
+  placeholder: string; onSelect: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const suggestions = options.filter(o => value && o.toLowerCase().includes(value.toLowerCase()) && o !== value);
+  const suggestions = options.filter(o => value && o.toLowerCase().includes(value.toLowerCase()));
   return (
     <div ref={containerRef} className="relative">
       <input type="text" value={value}
         onChange={e => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
-        onKeyDown={e => { if (e.key === "Enter") { setOpen(false); onEnter(); } if (e.key === "Escape") setOpen(false); }}
+        onKeyDown={e => { if (e.key === "Enter") { setOpen(false); onSelect(value); } if (e.key === "Escape") setOpen(false); }}
         placeholder={placeholder}
         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
       {open && suggestions.length > 0 && (
         <ul className="absolute z-20 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto">
           {suggestions.slice(0, 25).map(o => (
-            <li key={o} onMouseDown={() => { onChange(o); setOpen(false); }}
+            <li key={o} onMouseDown={() => { onSelect(o); setOpen(false); }}
               className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 truncate">{o}</li>
           ))}
         </ul>
@@ -66,15 +70,28 @@ export default function CompetitionView({ competition, categories }: Props) {
   const [clubInput, setClubInput] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [coachInput, setCoachInput] = useState("");
-  const [clubFilter, setClubFilter] = useState("");
-  const [nameFilter, setNameFilter] = useState("");
-  const [coachFilter, setCoachFilter] = useState("");
+  const [chips, setChips] = useState<FilterChip[]>([]);
   const [selectedAthlete, setSelectedAthlete] = useState<string | null>(null);
 
-  function applyFilters() { setClubFilter(clubInput); setNameFilter(nameInput); setCoachFilter(coachInput); setSelectedAthlete(null); }
-  function resetFilters() { setClubInput(""); setNameInput(""); setCoachInput(""); setClubFilter(""); setNameFilter(""); setCoachFilter(""); setSelectedAthlete(null); }
-  const hasActiveFilter = clubFilter || nameFilter || coachFilter;
-  const hasPendingChange = clubInput !== clubFilter || nameInput !== nameFilter || coachInput !== coachFilter;
+  function addChip(field: FilterField, value: string) {
+    if (!value.trim()) return;
+    if (chips.some(c => c.field === field && c.value === value)) return;
+    setChips(prev => [...prev, { field, value, label: FIELD_LABELS[field] }]);
+    if (field === "club") setClubInput("");
+    if (field === "name") setNameInput("");
+    if (field === "coach") setCoachInput("");
+    setSelectedAthlete(null);
+  }
+
+  function removeChip(field: FilterField, value: string) {
+    setChips(prev => prev.filter(c => !(c.field === field && c.value === value)));
+    setSelectedAthlete(null);
+  }
+
+  function clearAllChips() {
+    setChips([]); setClubInput(""); setNameInput(""); setCoachInput("");
+    setSelectedAthlete(null);
+  }
 
   const catData = categories.find(c => c.id === activeCat);
 
@@ -88,12 +105,17 @@ export default function CompetitionView({ competition, categories }: Props) {
   const coaches = useMemo(() => [...new Set(ranked.flatMap(a => a.coach ? a.coach.split(/[,;]/).map(s => s.trim()) : []).filter(Boolean))].sort(), [ranked]);
 
   const filtered = useMemo(() => {
-    let result = ranked;
-    if (clubFilter) result = result.filter(a => a.club.toLowerCase().includes(clubFilter.toLowerCase()));
-    if (nameFilter) result = result.filter(a => a.name.toLowerCase().includes(nameFilter.toLowerCase()));
-    if (coachFilter) result = result.filter(a => a.coach.toLowerCase().includes(coachFilter.toLowerCase()));
-    return result;
-  }, [ranked, clubFilter, nameFilter, coachFilter]);
+    if (chips.length === 0) return ranked;
+    return ranked.filter(a =>
+      chips.every(chip => {
+        const val = chip.value.toLowerCase();
+        if (chip.field === "club")  return (a.club ?? "").toLowerCase().includes(val);
+        if (chip.field === "name")  return a.name.toLowerCase().includes(val);
+        if (chip.field === "coach") return (a.coach ?? "").toLowerCase().includes(val);
+        return true;
+      })
+    );
+  }, [ranked, chips]);
 
   const athlete = useMemo(() =>
     selectedAthlete ? ranked.find(a => a.name === selectedAthlete) ?? null : null,
@@ -105,6 +127,9 @@ export default function CompetitionView({ competition, categories }: Props) {
     [athlete, ranked]
   );
 
+  const clubChip = chips.find(c => c.field === "club");
+  const isSingleClubFilter = clubChip && chips.length === 1;
+
   return (
     <div className="flex flex-1 overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
       {/* Sidebar */}
@@ -113,7 +138,7 @@ export default function CompetitionView({ competition, categories }: Props) {
         <div className="p-3 border-b border-gray-200">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Kategorie</p>
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => { setActiveCat(cat.id); resetFilters(); }}
+            <button key={cat.id} onClick={() => { setActiveCat(cat.id); clearAllChips(); }}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between mb-0.5 ${activeCat === cat.id ? "bg-[#1a3a5c] text-white font-semibold" : "hover:bg-gray-50 text-gray-700"}`}>
               <span>{cat.name}</span>
               <span className={`text-xs ${activeCat === cat.id ? "opacity-60" : "text-gray-400"}`}>{cat.results.length}</span>
@@ -123,30 +148,46 @@ export default function CompetitionView({ competition, categories }: Props) {
 
         {/* Filters */}
         <div className="p-3 border-b border-gray-200 space-y-3">
+          {/* Active filter chips */}
+          {chips.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Aktivní filtry</p>
+              <div className="flex flex-wrap gap-1.5">
+                {chips.map(chip => (
+                  <span key={`${chip.field}:${chip.value}`}
+                    className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                    <span className="text-blue-400">{chip.label}:</span>
+                    <span className="max-w-[120px] truncate">{chip.value}</span>
+                    <button onClick={() => removeChip(chip.field, chip.value)}
+                      className="ml-0.5 text-blue-400 hover:text-blue-700">×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Oddíl</p>
-            <AutocompleteInput value={clubInput} onChange={setClubInput} options={clubs} placeholder="Hledat oddíl…" onEnter={applyFilters} />
+            <p className="text-xs text-gray-500 mb-1">Oddíl</p>
+            <AutocompleteInput value={clubInput} onChange={setClubInput} options={clubs}
+              placeholder="Hledat oddíl…" onSelect={v => addChip("club", v)} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Závodník</p>
-            <AutocompleteInput value={nameInput} onChange={setNameInput} options={names} placeholder="Hledat jméno…" onEnter={applyFilters} />
+            <p className="text-xs text-gray-500 mb-1">Závodník</p>
+            <AutocompleteInput value={nameInput} onChange={setNameInput} options={names}
+              placeholder="Hledat jméno…" onSelect={v => addChip("name", v)} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Trenér</p>
-            <AutocompleteInput value={coachInput} onChange={setCoachInput} options={coaches} placeholder="Hledat trenéra…" onEnter={applyFilters} />
+            <p className="text-xs text-gray-500 mb-1">Trenér</p>
+            <AutocompleteInput value={coachInput} onChange={setCoachInput} options={coaches}
+              placeholder="Hledat trenéra…" onSelect={v => addChip("coach", v)} />
           </div>
-          <div className="flex gap-2 pt-1">
-            <button onClick={applyFilters}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${hasPendingChange ? "bg-[#1a3a5c] text-white hover:bg-[#14304e]" : "bg-gray-100 text-gray-400 cursor-default"}`}>
-              Filtrovat
+
+          {chips.length > 0 && (
+            <button onClick={clearAllChips}
+              className="w-full py-1.5 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition-colors">
+              Zrušit filtry
             </button>
-            {hasActiveFilter && (
-              <button onClick={resetFilters}
-                className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors">
-                Zrušit
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </aside>
 
@@ -154,10 +195,10 @@ export default function CompetitionView({ competition, categories }: Props) {
       <main className="flex-1 overflow-y-auto p-6">
         {athlete ? (
           <AthleteDetail a={athlete} ranked={ranked} feedback={feedback} />
-        ) : clubFilter ? (
-          <ClubView athletes={filtered} allAthletes={ranked} clubName={clubFilter} />
+        ) : isSingleClubFilter ? (
+          <ClubView athletes={filtered} allAthletes={ranked} clubName={clubChip.value} />
         ) : (
-          <OverviewView athletes={ranked} onSelect={setSelectedAthlete} />
+          <OverviewView athletes={filtered} onSelect={setSelectedAthlete} />
         )}
       </main>
     </div>

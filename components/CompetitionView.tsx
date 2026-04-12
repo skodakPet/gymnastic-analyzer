@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
+import Link from "next/link";
 import { calcRankings, generateFeedback } from "@/lib/analytics";
 import type { RankedAthlete, Result } from "@/lib/types";
 import { DISC_NAMES } from "@/lib/types";
@@ -8,6 +9,7 @@ interface CategoryData { id: string; name: string; results: Result[]; }
 interface Props {
   competition: { id: string; name: string; date: string | null; location: string | null };
   categories: CategoryData[];
+  gymnastIds?: Record<string, string>; // name → gymnast_id, for profile links
 }
 
 type FilterField = "club" | "name" | "coach";
@@ -65,7 +67,7 @@ function rankPill(rank: number, total: number) {
   return "bg-red-100 text-red-700";
 }
 
-export default function CompetitionView({ competition, categories }: Props) {
+export default function CompetitionView({ competition, categories, gymnastIds = {} }: Props) {
   const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "");
   const [clubInput, setClubInput] = useState("");
   const [nameInput, setNameInput] = useState("");
@@ -198,7 +200,7 @@ export default function CompetitionView({ competition, categories }: Props) {
         ) : isSingleClubFilter ? (
           <ClubView athletes={filtered} allAthletes={ranked} clubName={clubChip.value} />
         ) : (
-          <OverviewView athletes={filtered} onSelect={setSelectedAthlete} />
+          <OverviewView athletes={filtered} onSelect={setSelectedAthlete} gymnastIds={gymnastIds} />
         )}
       </main>
     </div>
@@ -206,7 +208,7 @@ export default function CompetitionView({ competition, categories }: Props) {
 }
 
 /* ---- Overview ---- */
-function OverviewView({ athletes, onSelect }: { athletes: RankedAthlete[]; onSelect: (n: string) => void }) {
+function OverviewView({ athletes, onSelect, gymnastIds = {} }: { athletes: RankedAthlete[]; onSelect: (n: string) => void; gymnastIds?: Record<string, string> }) {
   const avg = athletes.reduce((s, a) => s + a.celkem, 0) / athletes.length;
   return (
     <>
@@ -234,7 +236,13 @@ function OverviewView({ athletes, onSelect }: { athletes: RankedAthlete[]; onSel
             {athletes.map(a => (
               <tr key={a.name} onClick={() => onSelect(a.name)} className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors">
                 <td className="px-4 py-2.5 text-sm font-bold text-gray-500">{medal(a.overallRank)}{a.overallRank}.</td>
-                <td className="px-4 py-2.5 text-sm font-semibold text-gray-800">{a.name}</td>
+                <td className="px-4 py-2.5 text-sm font-semibold text-gray-800">
+                  {gymnastIds[a.name] ? (
+                    <Link href={`/gymnasts/${gymnastIds[a.name]}`} className="text-[#2563a8] hover:underline" onClick={e => e.stopPropagation()}>
+                      {a.name}
+                    </Link>
+                  ) : a.name}
+                </td>
                 <td className="px-4 py-2.5 text-xs text-gray-400">{a.club || "—"}</td>
                 {a.disciplines.map((d, i) => (
                   <td key={i} className="px-4 py-2.5 text-sm text-right font-mono">{d.total.toFixed(3)}</td>

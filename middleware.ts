@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // Refresh Supabase session
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -24,23 +25,15 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
+  // Přihlášený uživatel na login/register → přesměrovat na dashboard
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/register");
-  // Public read-only routes — accessible without login
-  const isPublicRead = pathname === "/" || pathname.startsWith("/competitions/");
-  const needsAuth = !isAuthPage && !isPublicRead && !pathname.startsWith("/api/auth");
-
-  if (!user && needsAuth) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
+  // Všechny ostatní routes jsou veřejné (read-only app)
   return supabaseResponse;
 }
 

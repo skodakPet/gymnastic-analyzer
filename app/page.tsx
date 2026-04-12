@@ -1,28 +1,34 @@
 import { createClient } from "@/lib/supabase/server";
+import { getTeamDashboard } from "@/lib/queries";
 import Link from "next/link";
-import type { Competition } from "@/lib/types";
+import TeamScoreChart from "@/components/TeamScoreChart";
+
+function medal(r: number) { return r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : ""; }
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: competitions } = await supabase
-    .from("competitions")
-    .select("*, categories(id, name)")
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false });
+  const stats = await getTeamDashboard();
+
+  const totalMedals = stats.reduce((s, c) => s + c.medals, 0);
+
+  const chartData = stats
+    .filter(c => c.date && c.avgScore > 0)
+    .map(c => ({
+      label: c.name.length > 20 ? c.name.substring(0, 18) + "…" : c.name,
+      avgScore: c.avgScore,
+    }));
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
       <header className="bg-[#1a3a5c] text-white px-6 h-14 flex items-center gap-4">
         <span className="font-black text-lg">Gym<span className="text-[#f6a96e]">Analyze</span></span>
-        {user && (
-          <nav className="flex gap-1 ml-4">
-            <Link href="/" className="px-3 py-1.5 rounded-md text-sm bg-white/15 font-medium">Soutěže</Link>
-            <Link href="/upload" className="px-3 py-1.5 rounded-md text-sm hover:bg-white/10 font-medium">+ Nahrát PDF</Link>
-          </nav>
-        )}
+        <nav className="flex gap-1 ml-4">
+          <Link href="/" className="px-3 py-1.5 rounded-md text-sm bg-white/15 font-medium">Dashboard</Link>
+          <Link href="/gymnasts" className="px-3 py-1.5 rounded-md text-sm hover:bg-white/10 font-medium">Gymnastky</Link>
+        </nav>
         <div className="ml-auto flex items-center gap-3">
           {user ? (
             <>
@@ -38,29 +44,43 @@ export default async function DashboardPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">Soutěže</h1>
-          {user && (
-            <Link href="/upload" className="bg-[#e85d26] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors">
-              + Nahrát PDF
-            </Link>
-          )}
+        {/* Summary cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+          {[
+            { label: "Soutěží", value: stats.length, icon: "🏆" },
+            { label: "Medailí celkem", value: totalMedals, icon: "🥇" },
+            { label: "Výsledků v DB", value: stats.reduce((s, c) => s + c.homeCount, 0), icon: "🤸‍♀️" },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-5 py-4">
+              <p className="text-2xl mb-1">{s.icon}</p>
+              <p className="text-3xl font-black text-[#1a3a5c]">{s.value}</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wider mt-0.5">{s.label}</p>
+            </div>
+          ))}
         </div>
 
-        {!competitions || competitions.length === 0 ? (
+        {/* Score trend chart */}
+        {chartData.length >= 2 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-8">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Průměrné body týmu v čase</h2>
+            <TeamScoreChart data={chartData} />
+          </div>
+        )}
+
+        {/* Competition list */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-[#1a3a5c]">Soutěže</h2>
+        </div>
+
+        {stats.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
             <div className="text-5xl mb-4">🤸‍♀️</div>
             <h2 className="text-lg font-semibold text-gray-700 mb-2">Zatím žádné soutěže</h2>
-            <p className="text-gray-400 text-sm mb-6">{user ? "Nahrajte první PDF výsledkovou listinu" : "Žádné soutěže zatím nejsou k dispozici."}</p>
-            {user && (
-              <Link href="/upload" className="bg-[#1a3a5c] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2563a8]">
-                Nahrát první soutěž
-              </Link>
-            )}
+            <p className="text-gray-400 text-sm mb-6">Žádné soutěže zatím nejsou k dispozici.</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {competitions.map((c: Competition & { categories: { id: string; name: string }[] }) => (
+            {stats.map(c => (
               <Link key={c.id} href={`/competitions/${c.id}`}
                 className="bg-white rounded-xl border border-gray-200 p-5 hover:border-[#2563a8] hover:shadow-md transition-all group">
                 <div className="flex items-start justify-between mb-3">
@@ -69,10 +89,18 @@ export default async function DashboardPage() {
                 </div>
                 <h3 className="font-bold text-[#1a3a5c] group-hover:text-[#2563a8] transition-colors mb-1 line-clamp-2">{c.name}</h3>
                 {c.location && <p className="text-sm text-gray-400 mb-3">📍 {c.location}</p>}
-                <div className="flex gap-2 flex-wrap">
-                  {c.categories?.map((cat: { id: string; name: string }) => (
-                    <span key={cat.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{cat.name}</span>
-                  ))}
+                <div className="flex gap-3 mt-3 text-xs">
+                  {c.homeCount > 0 && (
+                    <span className="text-gray-500">🤸‍♀️ {c.homeCount} výsledků</span>
+                  )}
+                  {c.medals > 0 && (
+                    <span className="text-amber-600 font-semibold">
+                      {[...Array(Math.min(c.medals, 3))].map((_, i) => medal(i + 1)).join("")} {c.medals}×
+                    </span>
+                  )}
+                  {c.avgScore > 0 && (
+                    <span className="text-gray-500">⌀ {c.avgScore.toFixed(2)} b.</span>
+                  )}
                 </div>
               </Link>
             ))}

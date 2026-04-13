@@ -275,7 +275,7 @@ export async function getWhatIfAnalysis(
 
 export interface CompetitionDetail {
   competition: Competition;
-  categories: { id: string; name: string; results: Result[] }[];
+  categories: { id: string; name: string; results: (Result & { isHome: boolean })[] }[];
   gymnastIdMap: Record<string, string>; // name → gymnast_id
 }
 
@@ -298,6 +298,9 @@ export async function getCompetitionDetail(id: string): Promise<CompetitionDetai
 
   const allResults = (results ?? []) as Result[];
 
+  const homeClub = process.env.HOME_CLUB_NAME;
+  const homeBirthYear = process.env.HOME_BIRTH_YEAR ? parseInt(process.env.HOME_BIRTH_YEAR, 10) : null;
+
   // Seskupit podle kategorie
   const catMap = new Map<string, Result[]>();
   for (const r of allResults) {
@@ -308,7 +311,14 @@ export async function getCompetitionDetail(id: string): Promise<CompetitionDetai
 
   const categories = Array.from(catMap.entries())
     .sort(([a], [b]) => a.localeCompare(b, "cs"))
-    .map(([name, res]) => ({ id: name, name, results: res }));
+    .map(([name, res]) => ({
+      id: name,
+      name,
+      results: res.map(r => ({
+        ...r,
+        isHome: !!(homeClub && homeBirthYear && r.club === homeClub && r.birth_year === homeBirthYear),
+      })),
+    }));
 
   // Mapa jméno → gymnast_id (pro zobrazení linků na profily)
   const gymnastIdMap: Record<string, string> = {};

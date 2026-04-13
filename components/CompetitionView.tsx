@@ -1,62 +1,36 @@
 "use client";
-import { useState, useMemo, useRef, Fragment } from "react";
+import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
 import { calcRankings, generateFeedback } from "@/lib/analytics";
 import type { RankedAthlete, Result } from "@/lib/types";
 import { DISC_NAMES } from "@/lib/types";
 
-interface CategoryData { id: string; name: string; results: Result[]; }
+interface CategoryData {
+  id: string;
+  name: string;
+  results: (Result & { isHome: boolean })[];
+}
+
 interface Props {
   competition: { id: string; name: string; date: string | null; location: string | null };
   categories: CategoryData[];
-  gymnastIds?: Record<string, string>; // name → gymnast_id, for profile links
+  gymnastIds?: Record<string, string>;
   defaultCategoryId?: string;
 }
 
-type FilterField = "club" | "name" | "coach";
-interface FilterChip { field: FilterField; value: string; label: string; }
-const FIELD_LABELS: Record<FilterField, string> = { club: "Oddíl", name: "Závodník", coach: "Trenér" };
-
-function resultToAthlete(r: Result) {
+function resultToAthlete(r: Result & { isHome: boolean }) {
   return {
     rank: r.rank, name: r.name, year: r.birth_year ?? 0,
     club: r.club ?? "", coach: r.coach ?? "",
+    isHome: r.isHome,
     disciplines: [
       { D: r.preskok_d, E: r.preskok_e, pen: r.preskok_pen, total: r.preskok_total },
       { D: r.bradla_d,  E: r.bradla_e,  pen: r.bradla_pen,  total: r.bradla_total  },
       { D: r.kladina_d, E: r.kladina_e, pen: r.kladina_pen, total: r.kladina_total },
       { D: r.prostna_d, E: r.prostna_e, pen: r.prostna_pen, total: r.prostna_total },
-    ] as [any,any,any,any],
+    ] as [any, any, any, any],
     celkem: r.celkem,
   };
-}
-
-function AutocompleteInput({ value, onChange, options, placeholder, onSelect }: {
-  value: string; onChange: (v: string) => void; options: string[];
-  placeholder: string; onSelect: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const suggestions = options.filter(o => value && o.toLowerCase().includes(value.toLowerCase()));
-  return (
-    <div ref={containerRef} className="relative">
-      <input type="text" value={value}
-        onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 120)}
-        onKeyDown={e => { if (e.key === "Enter") { setOpen(false); onSelect(value); } if (e.key === "Escape") setOpen(false); }}
-        placeholder={placeholder}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-      {open && suggestions.length > 0 && (
-        <ul className="absolute z-20 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto">
-          {suggestions.slice(0, 25).map(o => (
-            <li key={o} onMouseDown={() => { onSelect(o); setOpen(false); }}
-              className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 truncate">{o}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 function medal(r: number) { return r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : ""; }
@@ -74,164 +48,98 @@ export default function CompetitionView({ competition, categories, gymnastIds = 
       ? defaultCategoryId
       : categories[0]?.id ?? ""
   );
-  const [clubInput, setClubInput] = useState("");
-  const [nameInput, setNameInput] = useState("");
-  const [coachInput, setCoachInput] = useState("");
-  const [chips, setChips] = useState<FilterChip[]>([]);
   const [selectedAthlete, setSelectedAthlete] = useState<string | null>(null);
-
-  function addChip(field: FilterField, value: string) {
-    if (!value.trim()) return;
-    if (chips.some(c => c.field === field && c.value === value)) return;
-    setChips(prev => [...prev, { field, value, label: FIELD_LABELS[field] }]);
-    if (field === "club") setClubInput("");
-    if (field === "name") setNameInput("");
-    if (field === "coach") setCoachInput("");
-    setSelectedAthlete(null);
-  }
-
-  function removeChip(field: FilterField, value: string) {
-    setChips(prev => prev.filter(c => !(c.field === field && c.value === value)));
-    setSelectedAthlete(null);
-  }
-
-  function clearAllChips() {
-    setChips([]); setClubInput(""); setNameInput(""); setCoachInput("");
-    setSelectedAthlete(null);
-  }
 
   const catData = categories.find(c => c.id === activeCat);
 
-  const ranked = useMemo(() => {
+  const athletes = useMemo(() => {
     if (!catData) return [];
     return calcRankings(catData.results.map(resultToAthlete));
   }, [catData]);
 
-  const clubs = useMemo(() => [...new Set(ranked.map(a => a.club).filter(Boolean))].sort(), [ranked]);
-  const names = useMemo(() => [...new Set(ranked.map(a => a.name).filter(Boolean))].sort(), [ranked]);
-  const coaches = useMemo(() => [...new Set(ranked.flatMap(a => a.coach ? a.coach.split(/[,;]/).map(s => s.trim()) : []).filter(Boolean))].sort(), [ranked]);
-
-  const filtered = useMemo(() => {
-    if (chips.length === 0) return ranked;
-    return ranked.filter(a =>
-      chips.every(chip => {
-        const val = chip.value.toLowerCase();
-        if (chip.field === "club")  return (a.club ?? "").toLowerCase().includes(val);
-        if (chip.field === "name")  return a.name.toLowerCase().includes(val);
-        if (chip.field === "coach") return (a.coach ?? "").toLowerCase().includes(val);
-        return true;
-      })
-    );
-  }, [ranked, chips]);
-
   const athlete = useMemo(() =>
-    selectedAthlete ? ranked.find(a => a.name === selectedAthlete) ?? null : null,
-    [selectedAthlete, ranked]
+    selectedAthlete ? athletes.find(a => a.name === selectedAthlete) ?? null : null,
+    [selectedAthlete, athletes]
   );
 
   const feedback = useMemo(() =>
-    athlete ? generateFeedback(athlete, ranked) : [],
-    [athlete, ranked]
+    athlete ? generateFeedback(athlete, athletes) : [],
+    [athlete, athletes]
   );
-
-  const clubChip = chips.find(c => c.field === "club");
-  const isSingleClubFilter = clubChip && chips.length === 1;
 
   return (
     <div className="flex flex-1 overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
       {/* Sidebar */}
-      <aside className="w-72 bg-white border-r border-gray-200 flex flex-col overflow-hidden flex-shrink-0">
-        {/* Categories */}
-        <div className="p-3 border-b border-gray-200">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-y-auto flex-shrink-0">
+        <div className="p-3">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Kategorie</p>
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => { setActiveCat(cat.id); clearAllChips(); }}
+            <button key={cat.id} onClick={() => { setActiveCat(cat.id); setSelectedAthlete(null); }}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between mb-0.5 ${activeCat === cat.id ? "bg-[#1a3a5c] text-white font-semibold" : "hover:bg-gray-50 text-gray-700"}`}>
               <span>{cat.name}</span>
               <span className={`text-xs ${activeCat === cat.id ? "opacity-60" : "text-gray-400"}`}>{cat.results.length}</span>
             </button>
           ))}
         </div>
-
-        {/* Filters */}
-        <div className="p-3 border-b border-gray-200 space-y-3">
-          {/* Active filter chips */}
-          {chips.length > 0 && (
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Aktivní filtry</p>
-              <div className="flex flex-wrap gap-1.5">
-                {chips.map(chip => (
-                  <span key={`${chip.field}:${chip.value}`}
-                    className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
-                    <span className="text-blue-400">{chip.label}:</span>
-                    <span className="max-w-[120px] truncate">{chip.value}</span>
-                    <button onClick={() => removeChip(chip.field, chip.value)}
-                      className="ml-0.5 text-blue-400 hover:text-blue-700">×</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Oddíl</p>
-            <AutocompleteInput value={clubInput} onChange={setClubInput} options={clubs}
-              placeholder="Hledat oddíl…" onSelect={v => addChip("club", v)} />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Závodník</p>
-            <AutocompleteInput value={nameInput} onChange={setNameInput} options={names}
-              placeholder="Hledat jméno…" onSelect={v => addChip("name", v)} />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Trenér</p>
-            <AutocompleteInput value={coachInput} onChange={setCoachInput} options={coaches}
-              placeholder="Hledat trenéra…" onSelect={v => addChip("coach", v)} />
-          </div>
-
-          {chips.length > 0 && (
-            <button onClick={clearAllChips}
-              className="w-full py-1.5 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition-colors">
-              Zrušit filtry
-            </button>
-          )}
-        </div>
       </aside>
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto p-6">
         {athlete ? (
-          <AthleteDetail a={athlete} ranked={ranked} feedback={feedback} />
-        ) : isSingleClubFilter ? (
-          <ClubView athletes={filtered} allAthletes={ranked} clubName={clubChip.value} />
+          <AthleteDetail
+            a={athlete}
+            ranked={athletes}
+            feedback={feedback}
+            onBack={() => setSelectedAthlete(null)}
+          />
         ) : (
-          <OverviewView athletes={filtered} onSelect={setSelectedAthlete} gymnastIds={gymnastIds} />
+          <CategoryResultsTable
+            athletes={athletes}
+            onSelect={setSelectedAthlete}
+            gymnastIds={gymnastIds}
+          />
         )}
       </main>
     </div>
   );
 }
 
-/* ---- Overview ---- */
-function OverviewView({ athletes, onSelect, gymnastIds = {} }: { athletes: RankedAthlete[]; onSelect: (n: string) => void; gymnastIds?: Record<string, string> }) {
-  const avg = athletes.reduce((s, a) => s + a.celkem, 0) / athletes.length;
+/* ── Category Results Table ─────────────────────────────────────────────────── */
+
+type HomeAthlete = RankedAthlete & { isHome?: boolean };
+
+function CategoryResultsTable({
+  athletes,
+  onSelect,
+  gymnastIds = {},
+}: {
+  athletes: HomeAthlete[];
+  onSelect: (n: string) => void;
+  gymnastIds?: Record<string, string>;
+}) {
+  const avg = athletes.length > 0 ? athletes.reduce((s, a) => s + a.celkem, 0) / athletes.length : 0;
   const hasPen = athletes.some(a => a.disciplines.some(d => d.pen > 0));
+  const homeCount = athletes.filter(a => a.isHome).length;
 
   return (
     <>
+      {/* Stats */}
       <div className="flex gap-4 mb-6 flex-wrap">
         {[
           { label: "Závodnic", value: athletes.length, sub: "v kategorii" },
           { label: "Průměr", value: avg.toFixed(2), sub: "bodů celkem" },
-          { label: "Vítěz", value: athletes[0]?.name.split(" ")[0] ?? "—", sub: athletes[0]?.celkem.toFixed(3) + " b." },
+          { label: "Vítěz", value: athletes[0]?.name.split(" ")[0] ?? "—", sub: athletes[0] ? `${athletes[0].celkem.toFixed(3)} b.` : "" },
+          ...(homeCount > 0 ? [{ label: "Domácí", value: homeCount, sub: "závodnic" }] : []),
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-5 py-4 flex-1 min-w-32">
+          <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-5 py-4 flex-1 min-w-28">
             <p className="text-xs text-gray-400 uppercase tracking-wider">{s.label}</p>
             <p className="text-2xl font-black text-[#1a3a5c] mt-0.5">{s.value}</p>
             <p className="text-xs text-gray-400">{s.sub}</p>
           </div>
         ))}
       </div>
+
+      {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs whitespace-nowrap">
@@ -258,34 +166,57 @@ function OverviewView({ athletes, onSelect, gymnastIds = {} }: { athletes: Ranke
               </tr>
             </thead>
             <tbody>
-              {athletes.map(a => (
-                <tr key={a.name} onClick={() => onSelect(a.name)}
-                  className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors">
-                  <td className="px-3 py-2 font-bold text-gray-500">{medal(a.overallRank)}{a.overallRank}.</td>
-                  <td className="px-3 py-2 font-semibold text-gray-800">
-                    {gymnastIds[a.name] ? (
-                      <Link href={`/gymnasts/${gymnastIds[a.name]}`} className="text-[#2563a8] hover:underline" onClick={e => e.stopPropagation()}>
-                        {a.name}
-                      </Link>
-                    ) : a.name}
-                  </td>
-                  <td className="px-2 py-2 text-center text-gray-400">{a.year || "—"}</td>
-                  <td className="px-3 py-2 text-gray-400">{a.club || "—"}</td>
-                  {a.disciplines.map((d, i) => (
-                    <Fragment key={i}>
-                      <td className="px-2 py-2 text-center font-mono border-l border-gray-100 text-gray-600">{d.D.toFixed(3)}</td>
-                      <td className="px-2 py-2 text-center font-mono text-gray-600">{d.E.toFixed(3)}</td>
-                      {hasPen && (
-                        <td className="px-2 py-2 text-center font-mono text-red-500">
-                          {d.pen > 0 ? `-${d.pen.toFixed(3)}` : "—"}
+              {athletes.map(a => {
+                const isHome = (a as HomeAthlete).isHome;
+                return (
+                  <tr
+                    key={a.name}
+                    onClick={() => onSelect(a.name)}
+                    className={`border-t border-gray-100 cursor-pointer transition-colors ${
+                      isHome
+                        ? "bg-blue-50 hover:bg-blue-100 border-l-2 border-l-blue-500"
+                        : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <td className="px-3 py-2 font-bold text-gray-500 whitespace-nowrap">
+                      {medal(a.overallRank)}{a.overallRank}.
+                    </td>
+                    <td className={`px-3 py-2 font-semibold whitespace-nowrap ${isHome ? "text-blue-800" : "text-gray-800"}`}>
+                      {gymnastIds[a.name] ? (
+                        <Link
+                          href={`/gymnasts/${gymnastIds[a.name]}`}
+                          className="text-[#2563a8] hover:underline"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {a.name}
+                        </Link>
+                      ) : a.name}
+                      {isHome && <span className="ml-1.5 text-blue-400 text-xs">●</span>}
+                    </td>
+                    <td className="px-2 py-2 text-center text-gray-400">{a.year || "—"}</td>
+                    <td className={`px-3 py-2 whitespace-nowrap ${isHome ? "text-blue-700 font-medium" : "text-gray-400"}`}>
+                      {a.club || "—"}
+                    </td>
+                    {a.disciplines.map((d, i) => (
+                      <Fragment key={i}>
+                        <td className="px-2 py-2 text-center font-mono border-l border-gray-100 text-gray-600">{d.D.toFixed(3)}</td>
+                        <td className="px-2 py-2 text-center font-mono text-gray-600">{d.E.toFixed(3)}</td>
+                        {hasPen && (
+                          <td className="px-2 py-2 text-center font-mono text-red-500">
+                            {d.pen > 0 ? `-${d.pen.toFixed(3)}` : "—"}
+                          </td>
+                        )}
+                        <td className={`px-2 py-2 text-center font-mono font-bold ${isHome ? "text-blue-800" : "text-gray-800"}`}>
+                          {d.total.toFixed(3)}
                         </td>
-                      )}
-                      <td className="px-2 py-2 text-center font-mono font-bold text-gray-800">{d.total.toFixed(3)}</td>
-                    </Fragment>
-                  ))}
-                  <td className="px-3 py-2 text-right font-black text-[#1a3a5c] border-l border-gray-100">{a.celkem.toFixed(3)}</td>
-                </tr>
-              ))}
+                      </Fragment>
+                    ))}
+                    <td className={`px-3 py-2 text-right font-black border-l border-gray-100 ${isHome ? "text-blue-900" : "text-[#1a3a5c]"}`}>
+                      {a.celkem.toFixed(3)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -294,76 +225,31 @@ function OverviewView({ athletes, onSelect, gymnastIds = {} }: { athletes: Ranke
   );
 }
 
-/* ---- Club View ---- */
-function ClubView({ athletes, allAthletes, clubName }: { athletes: RankedAthlete[]; allAthletes: RankedAthlete[]; clubName: string }) {
-  const maxD = allAthletes[0]?.catMaxD ?? 2;
-  return (
-    <>
-      <h2 className="text-xl font-bold text-[#1a3a5c] mb-4">🏛 {clubName}</h2>
-      <div className="flex gap-4 mb-6 flex-wrap">
-        {[
-          { label: "Závodnic", value: athletes.length, sub: `ze ${allAthletes.length} v kat.` },
-          { label: "Nejlepší", value: athletes[0]?.overallRank + ". místo", sub: athletes[0]?.name ?? "" },
-          { label: "Průměr oddílu", value: (athletes.reduce((s,a) => s + a.celkem, 0) / athletes.length).toFixed(2), sub: `vs ${(allAthletes.reduce((s,a) => s + a.celkem, 0) / allAthletes.length).toFixed(2)} kat.` },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-5 py-4 flex-1 min-w-32">
-            <p className="text-xs text-gray-400 uppercase tracking-wider">{s.label}</p>
-            <p className="text-2xl font-black text-[#1a3a5c] mt-0.5">{s.value}</p>
-            <p className="text-xs text-gray-400">{s.sub}</p>
-          </div>
-        ))}
-      </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead><tr className="bg-[#1a3a5c] text-white text-xs uppercase tracking-wide">
-            {["Pořadí", "Závodnice", "Přeskok", "Bradla", "Kladina", "Prostná", "Celkem", "Potenciál D max"].map(h => (
-              <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {athletes.map(a => {
-              const hypoGain = a.disciplines.reduce((s, d) => s + (maxD - d.D), 0);
-              const hypoT = a.celkem + hypoGain;
-              const hypoR = allAthletes.filter(x => x.celkem > hypoT).length + 1;
-              return (
-                <tr key={a.name} className="border-t border-gray-100 hover:bg-blue-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${rankPill(a.overallRank, allAthletes.length)}`}>
-                      {medal(a.overallRank)}{a.overallRank}. / {allAthletes.length}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-sm">{a.name}</td>
-                  {a.disciplines.map((d, di) => (
-                    <td key={di} className="px-4 py-3 text-sm">
-                      <span className="font-mono">{d.total.toFixed(3)}</span>
-                      <span className="text-xs text-gray-400 ml-1">({a.discRanks[di]}.)</span>
-                    </td>
-                  ))}
-                  <td className="px-4 py-3 font-black text-[#1a3a5c]">{a.celkem.toFixed(3)}</td>
-                  <td className="px-4 py-3 text-sm text-blue-600">
-                    {hypoGain > 0.01 ? <><span className="font-bold">{hypoT.toFixed(3)}</span> → {hypoR}. místo (+{(a.overallRank - hypoR)} ↑)</> : <span className="text-green-600">✓ max D</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
+/* ── Athlete Detail ──────────────────────────────────────────────────────────── */
 
-/* ---- Athlete Detail ---- */
-function AthleteDetail({ a, ranked, feedback }: { a: RankedAthlete; ranked: RankedAthlete[]; feedback: ReturnType<typeof generateFeedback> }) {
+function AthleteDetail({
+  a,
+  ranked,
+  feedback,
+  onBack,
+}: {
+  a: HomeAthlete;
+  ranked: HomeAthlete[];
+  feedback: ReturnType<typeof generateFeedback>;
+  onBack: () => void;
+}) {
   const maxD = a.catMaxD;
   const hypoGain = a.disciplines.reduce((s, d) => s + (maxD - d.D), 0);
   const hypoTotal = a.celkem + hypoGain;
   const hypoRank = ranked.filter(x => x.celkem > hypoTotal).length + 1;
-  const discColors = ["blue", "purple", "amber", "emerald"];
   const discBorders = ["border-l-blue-500", "border-l-purple-500", "border-l-amber-500", "border-l-emerald-500"];
 
   return (
     <>
+      <button onClick={onBack} className="mb-4 text-sm text-gray-500 hover:text-[#1a3a5c] flex items-center gap-1">
+        ← Zpět na výsledky
+      </button>
+
       {/* Header */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-5 flex gap-5 items-start flex-wrap">
         <div className="w-16 h-16 rounded-full bg-[#1a3a5c] text-white flex items-center justify-center text-xl font-black flex-shrink-0">

@@ -60,12 +60,6 @@ export default async function RosterPage() {
                 </div>
 
                 <div className="space-y-1.5 text-sm">
-                  {g.lastCategory && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Kategorie</span>
-                      <span className="font-medium text-gray-700">{g.lastCategory}</span>
-                    </div>
-                  )}
                   {g.bestRankThisSeason !== undefined && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">Nejlepší umístění ({new Date().getFullYear()})</span>

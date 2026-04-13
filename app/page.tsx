@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTeamDashboard, getHomeResults } from "@/lib/queries";
+import { getTeamDashboard, getCompetitionCategoryRankings } from "@/lib/queries";
 import Link from "next/link";
 import TeamScoreChart from "@/components/TeamScoreChart";
 
@@ -9,7 +9,10 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [stats, homeResults] = await Promise.all([getTeamDashboard(), getHomeResults()]);
+  const [stats, rankings] = await Promise.all([
+    getTeamDashboard(),
+    getCompetitionCategoryRankings(),
+  ]);
 
   const totalMedals = stats.reduce((s, c) => s + c.medals, 0);
 
@@ -107,50 +110,58 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Results table — home group, ranked within category */}
-        {homeResults.length > 0 && (
+        {/* Category rankings — one tile per competition */}
+        {rankings.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-[#1a3a5c]">Výsledky v kategorii</h2>
+              <h2 className="text-lg font-bold text-[#1a3a5c]">Pořadí v kategorii</h2>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Soutěž</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Jméno</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Pořadí</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Body</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {homeResults.map((r, i) => {
-                    const comp = r.competitions as any;
-                    return (
-                      <tr key={r.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="px-4 py-2.5 max-w-[220px]">
-                          <Link href={`/competitions/${r.competition_id}`}
-                            className="text-[#2563a8] hover:underline line-clamp-1">
-                            {comp?.name ?? "—"}
-                          </Link>
-                          {comp?.date && (
-                            <span className="block text-xs text-gray-400">
-                              {new Date(comp.date).toLocaleDateString("cs-CZ")}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 font-medium text-gray-800">{r.name}</td>
-                        <td className="px-4 py-2.5 text-center font-bold text-[#1a3a5c]">
-                          {medal(r.rank)}{r.rank}.
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-mono text-gray-700">
-                          {r.celkem != null ? r.celkem.toFixed(3) : "—"}
-                        </td>
+            <div className="grid gap-6 lg:grid-cols-2">
+              {rankings.map(r => (
+                <div key={`${r.competitionId}-${r.categoryName}`}
+                  className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100">
+                    <Link href={`/competitions/${r.competitionId}`}
+                      className="font-bold text-[#1a3a5c] hover:text-[#2563a8] transition-colors line-clamp-1">
+                      {r.competitionName}
+                    </Link>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {r.competitionDate && new Date(r.competitionDate).toLocaleDateString("cs-CZ")}
+                      {" · "}kat. {r.categoryName}
+                      {" · "}{r.results.length} závodnic
+                    </p>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                        <th className="px-4 py-2.5 text-left">#</th>
+                        <th className="px-4 py-2.5 text-left">Závodnice</th>
+                        <th className="px-4 py-2.5 text-left">Oddíl</th>
+                        <th className="px-4 py-2.5 text-right">Celkem</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {r.results.map(row => (
+                        <tr key={row.id}
+                          className={`border-t border-gray-100 ${row.isHome ? "bg-blue-50" : "hover:bg-gray-50"}`}>
+                          <td className="px-4 py-2 font-bold text-gray-500 whitespace-nowrap">
+                            {medal(row.rank)}{row.rank}.
+                          </td>
+                          <td className={`px-4 py-2 ${row.isHome ? "font-semibold text-[#1a3a5c]" : "text-gray-800"}`}>
+                            {row.name}
+                          </td>
+                          <td className={`px-4 py-2 text-xs ${row.isHome ? "text-[#2563a8] font-medium" : "text-gray-400"}`}>
+                            {row.club || "—"}
+                          </td>
+                          <td className={`px-4 py-2 text-right font-mono font-black ${row.isHome ? "text-[#1a3a5c]" : "text-gray-700"}`}>
+                            {row.celkem?.toFixed(3) ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
             </div>
           </>
         )}

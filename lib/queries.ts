@@ -58,43 +58,91 @@ export async function getTeamDashboard(): Promise<CompetitionStats[]> {
   });
 }
 
-// ── Home Results ─────────────────────────────────────────────────────────────
+// ── Competition Category Rankings ────────────────────────────────────────────
 
-export interface HomeResult {
+export interface CategoryRankingRow {
   id: string;
-  competition_id: string;
   name: string;
-  category: string;
+  club: string | null;
   rank: number;
   celkem: number;
-  competitions: { id: string; name: string; date: string | null };
+  isHome: boolean;
 }
 
-export async function getHomeResults(): Promise<HomeResult[]> {
+export interface CategoryRanking {
+  competitionId: string;
+  competitionName: string;
+  competitionDate: string | null;
+  categoryName: string;
+  results: CategoryRankingRow[];
+}
+
+export async function getCompetitionCategoryRankings(): Promise<CategoryRanking[]> {
   const supabase = await createClient();
   const homeClub = process.env.HOME_CLUB_NAME;
   const homeBirthYear = process.env.HOME_BIRTH_YEAR ? parseInt(process.env.HOME_BIRTH_YEAR, 10) : null;
 
-  let query = supabase
+  // Krok 1: najdi soutěže + kategorie, kde závodí domovská skupina
+  let homeQuery = supabase
     .from("results")
-    .select("id, competition_id, name, category, rank, celkem, competitions(id, name, date)");
+    .select("competition_id, category, competitions(id, name, date)");
 
   if (homeClub && homeBirthYear) {
-    query = query.eq("club", homeClub).eq("birth_year", homeBirthYear);
+    homeQuery = homeQuery.eq("club", homeClub).eq("birth_year", homeBirthYear);
   } else {
-    query = query.not("gymnast_id", "is", null);
+    homeQuery = homeQuery.not("gymnast_id", "is", null);
   }
 
-  const { data } = await query;
-  const rows = (data ?? []) as unknown as HomeResult[];
+  const { data: homeRows } = await homeQuery;
+  if (!homeRows?.length) return [];
 
-  // Seřadit: nejnovější soutěž první, pak podle pořadí
-  return rows.sort((a, b) => {
-    const da = (a.competitions as any)?.date ?? "";
-    const db = (b.competitions as any)?.date ?? "";
-    if (da !== db) return da > db ? -1 : 1;
-    return (a.rank ?? 999) - (b.rank ?? 999);
+  const compMeta = new Map<string, { name: string; date: string | null; categories: Set<string> }>();
+  for (const r of homeRows as any[]) {
+    if (!compMeta.has(r.competition_id)) {
+      compMeta.set(r.competition_id, {
+        name: r.competitions?.name ?? "",
+        date: r.competitions?.date ?? null,
+        categories: new Set(),
+      });
+    }
+    compMeta.get(r.competition_id)!.categories.add(r.category);
+  }
+
+  // Krok 2: načti všechny výsledky pro tyto soutěže
+  const { data: allRows } = await supabase
+    .from("results")
+    .select("id, competition_id, name, club, rank, celkem, birth_year, category")
+    .in("competition_id", Array.from(compMeta.keys()))
+    .order("rank");
+
+  if (!allRows?.length) return [];
+
+  const rankings: CategoryRanking[] = [];
+  Array.from(compMeta.entries()).forEach(([compId, meta]) => {
+    Array.from(meta.categories).forEach(category => {
+      const catRows = (allRows as any[]).filter(
+        r => r.competition_id === compId && r.category === category
+      );
+      if (!catRows.length) return;
+
+      rankings.push({
+        competitionId: compId,
+        competitionName: meta.name,
+        competitionDate: meta.date,
+        categoryName: category,
+        results: catRows.map(r => ({
+          id: r.id,
+          name: r.name,
+          club: r.club,
+          rank: r.rank,
+          celkem: r.celkem,
+          isHome: !!(homeClub && homeBirthYear && r.club === homeClub && r.birth_year === homeBirthYear),
+        })),
+      });
+    });
   });
+
+  return rankings.sort((a, b) => (b.competitionDate ?? "") > (a.competitionDate ?? "") ? 1 : -1);
 }
 
 // ── Roster ────────────────────────────────────────────────────────────────────

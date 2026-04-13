@@ -4,8 +4,15 @@ import { notFound } from "next/navigation";
 import CompetitionView from "@/components/CompetitionView";
 import Link from "next/link";
 
-export default async function CompetitionPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CompetitionPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ cat?: string }>;
+}) {
   const { id } = await params;
+  const { cat } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -35,7 +42,7 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
         </div>
       </header>
 
-      <CompetitionView competition={competition} categories={categories} gymnastIds={gymnastIdMap} />
+      <CompetitionView competition={competition} categories={categories} gymnastIds={gymnastIdMap} defaultCategoryId={cat} />
     </div>
   );
 }

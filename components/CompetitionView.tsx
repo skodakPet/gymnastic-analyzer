@@ -10,6 +10,7 @@ interface Props {
   competition: { id: string; name: string; date: string | null; location: string | null };
   categories: CategoryData[];
   gymnastIds?: Record<string, string>; // name → gymnast_id, for profile links
+  defaultCategoryId?: string;
 }
 
 type FilterField = "club" | "name" | "coach";
@@ -67,8 +68,12 @@ function rankPill(rank: number, total: number) {
   return "bg-red-100 text-red-700";
 }
 
-export default function CompetitionView({ competition, categories, gymnastIds = {} }: Props) {
-  const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "");
+export default function CompetitionView({ competition, categories, gymnastIds = {}, defaultCategoryId }: Props) {
+  const [activeCat, setActiveCat] = useState(
+    defaultCategoryId && categories.some(c => c.id === defaultCategoryId)
+      ? defaultCategoryId
+      : categories[0]?.id ?? ""
+  );
   const [clubInput, setClubInput] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [coachInput, setCoachInput] = useState("");

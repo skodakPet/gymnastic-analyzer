@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTeamDashboard } from "@/lib/queries";
+import { getTeamDashboard, getHomeResults } from "@/lib/queries";
 import Link from "next/link";
 import TeamScoreChart from "@/components/TeamScoreChart";
 
@@ -9,7 +9,7 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const stats = await getTeamDashboard();
+  const [stats, homeResults] = await Promise.all([getTeamDashboard(), getHomeResults()]);
 
   const totalMedals = stats.reduce((s, c) => s + c.medals, 0);
 
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
             <p className="text-gray-400 text-sm mb-6">Žádné soutěže zatím nejsou k dispozici.</p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
             {stats.map(c => (
               <Link key={c.id} href={`/competitions/${c.id}`}
                 className="bg-white rounded-xl border border-gray-200 p-5 hover:border-[#2563a8] hover:shadow-md transition-all group">
@@ -105,6 +105,54 @@ export default async function DashboardPage() {
               </Link>
             ))}
           </div>
+        )}
+
+        {/* Results table — home group, ranked within category */}
+        {homeResults.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-[#1a3a5c]">Výsledky v kategorii</h2>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Soutěž</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Jméno</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Pořadí</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Body</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {homeResults.map((r, i) => {
+                    const comp = r.competitions as any;
+                    return (
+                      <tr key={r.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <td className="px-4 py-2.5 max-w-[220px]">
+                          <Link href={`/competitions/${r.competition_id}`}
+                            className="text-[#2563a8] hover:underline line-clamp-1">
+                            {comp?.name ?? "—"}
+                          </Link>
+                          {comp?.date && (
+                            <span className="block text-xs text-gray-400">
+                              {new Date(comp.date).toLocaleDateString("cs-CZ")}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 font-medium text-gray-800">{r.name}</td>
+                        <td className="px-4 py-2.5 text-center font-bold text-[#1a3a5c]">
+                          {medal(r.rank)}{r.rank}.
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-mono text-gray-700">
+                          {r.celkem != null ? r.celkem.toFixed(3) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </main>
     </div>

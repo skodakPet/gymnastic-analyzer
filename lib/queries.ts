@@ -58,6 +58,45 @@ export async function getTeamDashboard(): Promise<CompetitionStats[]> {
   });
 }
 
+// ── Home Results ─────────────────────────────────────────────────────────────
+
+export interface HomeResult {
+  id: string;
+  competition_id: string;
+  name: string;
+  category: string;
+  rank: number;
+  celkem: number;
+  competitions: { id: string; name: string; date: string | null };
+}
+
+export async function getHomeResults(): Promise<HomeResult[]> {
+  const supabase = await createClient();
+  const homeClub = process.env.HOME_CLUB_NAME;
+  const homeBirthYear = process.env.HOME_BIRTH_YEAR ? parseInt(process.env.HOME_BIRTH_YEAR, 10) : null;
+
+  let query = supabase
+    .from("results")
+    .select("id, competition_id, name, category, rank, celkem, competitions(id, name, date)");
+
+  if (homeClub && homeBirthYear) {
+    query = query.eq("club", homeClub).eq("birth_year", homeBirthYear);
+  } else {
+    query = query.not("gymnast_id", "is", null);
+  }
+
+  const { data } = await query;
+  const rows = (data ?? []) as unknown as HomeResult[];
+
+  // Seřadit: nejnovější soutěž první, pak podle pořadí
+  return rows.sort((a, b) => {
+    const da = (a.competitions as any)?.date ?? "";
+    const db = (b.competitions as any)?.date ?? "";
+    if (da !== db) return da > db ? -1 : 1;
+    return (a.rank ?? 999) - (b.rank ?? 999);
+  });
+}
+
 // ── Roster ────────────────────────────────────────────────────────────────────
 
 export async function getGymnastroster(): Promise<GymnastWithStats[]> {

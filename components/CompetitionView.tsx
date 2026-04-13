@@ -2,7 +2,7 @@
 import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
 import { calcRankings, generateFeedback } from "@/lib/analytics";
-import type { RankedAthlete, Result } from "@/lib/types";
+import type { Discipline, RankedAthlete, Result } from "@/lib/types";
 import { DISC_NAMES } from "@/lib/types";
 
 interface CategoryData {
@@ -18,6 +18,9 @@ interface Props {
   defaultCategoryId?: string;
 }
 
+// DB discipline columns are NUMERIC without NOT NULL — guard against null at runtime
+function n(v: number | null | undefined): number { return v ?? 0; }
+
 function resultToAthlete(r: Result & { isHome: boolean }) {
   return {
     id: r.id,
@@ -25,12 +28,12 @@ function resultToAthlete(r: Result & { isHome: boolean }) {
     club: r.club ?? "", coach: r.coach ?? "",
     isHome: r.isHome,
     disciplines: [
-      { D: r.preskok_d, E: r.preskok_e, pen: r.preskok_pen, total: r.preskok_total },
-      { D: r.bradla_d,  E: r.bradla_e,  pen: r.bradla_pen,  total: r.bradla_total  },
-      { D: r.kladina_d, E: r.kladina_e, pen: r.kladina_pen, total: r.kladina_total },
-      { D: r.prostna_d, E: r.prostna_e, pen: r.prostna_pen, total: r.prostna_total },
-    ] as [any, any, any, any],
-    celkem: r.celkem,
+      { D: n(r.preskok_d), E: n(r.preskok_e), pen: n(r.preskok_pen), total: n(r.preskok_total) },
+      { D: n(r.bradla_d),  E: n(r.bradla_e),  pen: n(r.bradla_pen),  total: n(r.bradla_total)  },
+      { D: n(r.kladina_d), E: n(r.kladina_e), pen: n(r.kladina_pen), total: n(r.kladina_total) },
+      { D: n(r.prostna_d), E: n(r.prostna_e), pen: n(r.prostna_pen), total: n(r.prostna_total) },
+    ] as [Discipline, Discipline, Discipline, Discipline],
+    celkem: n(r.celkem),
   };
 }
 

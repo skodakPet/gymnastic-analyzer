@@ -12,15 +12,15 @@ export default async function RosterPage() {
       <header className="bg-[#1a3a5c] text-white px-6 h-14 flex items-center gap-4">
         <Link href="/" className="font-black text-lg">Gym<span className="text-[#f6a96e]">Analyze</span></Link>
         <nav className="flex gap-1 ml-4">
-          <Link href="/" className="px-3 py-1.5 rounded-md text-sm hover:bg-white/10 font-medium">Dashboard</Link>
-          <Link href="/gymnasts" className="px-3 py-1.5 rounded-md text-sm bg-white/15 font-medium">Gymnastky</Link>
+          <Link href="/" className="px-3 py-2 rounded-md text-sm hover:bg-white/10 font-medium">Dashboard</Link>
+          <Link href="/gymnasts" className="px-3 py-2 rounded-md text-sm bg-white/15 font-medium">Gymnastky</Link>
         </nav>
         <div className="ml-auto flex items-center gap-3">
           {user ? (
             <>
-              <span className="text-sm opacity-70">{user.email}</span>
+              <span className="text-sm opacity-70 hidden sm:inline">{user.email}</span>
               <form action="/api/auth/signout" method="POST">
-                <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md">Odhlásit</button>
+                <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-2 rounded-md">Odhlásit</button>
               </form>
             </>
           ) : (
@@ -29,7 +29,7 @@ export default async function RosterPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-[#1a3a5c]">Gymnastky ({gymnasts.length})</h1>
         </div>

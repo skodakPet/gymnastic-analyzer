@@ -72,14 +72,14 @@ export default function CompetitionView({ competition, categories, gymnastIds = 
   );
 
   return (
-    <div className="flex flex-1 overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
+    <div className="flex flex-col md:flex-row flex-1 overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-y-auto flex-shrink-0">
-        <div className="p-3">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Kategorie</p>
+      <aside className="md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex-shrink-0 overflow-x-auto md:overflow-x-visible md:overflow-y-auto">
+        <div className="flex md:flex-col gap-1.5 p-2 md:p-3">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1 hidden md:block">Kategorie</p>
           {categories.map(cat => (
             <button key={cat.id} onClick={() => { setActiveCat(cat.id); setSelectedAthlete(null); }}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between mb-0.5 ${activeCat === cat.id ? "bg-[#1a3a5c] text-white font-semibold" : "hover:bg-gray-50 text-gray-700"}`}>
+              className={`whitespace-nowrap flex-shrink-0 md:w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${activeCat === cat.id ? "bg-[#1a3a5c] text-white font-semibold" : "bg-gray-100 md:bg-transparent hover:bg-gray-200 md:hover:bg-gray-50 text-gray-700"}`}>
               <span>{cat.name}</span>
               <span className={`text-xs ${activeCat === cat.id ? "opacity-60" : "text-gray-400"}`}>{cat.results.length}</span>
             </button>
@@ -88,7 +88,7 @@ export default function CompetitionView({ competition, categories, gymnastIds = 
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
         {athlete ? (
           <AthleteDetail
             a={athlete}
@@ -289,7 +289,7 @@ function AthleteDetail({
       )}
 
       {/* Disciplines */}
-      <div className="grid grid-cols-2 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
         {a.disciplines.map((d, i) => {
           const allE = ranked.map(x => x.disciplines[i].E);
           const avgE = allE.reduce((s, v) => s + v, 0) / allE.length;
@@ -357,7 +357,8 @@ function AthleteDetail({
 
       {/* Summary table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm whitespace-nowrap">
           <thead><tr className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wide border-b border-gray-200">
             {["Disciplína", "D", "E", "Celkem", "Pořadí", "Hypo (D max)"].map(h => <th key={h} className="px-4 py-3 text-left">{h}</th>)}
           </tr></thead>
@@ -387,6 +388,7 @@ function AthleteDetail({
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </>
   );

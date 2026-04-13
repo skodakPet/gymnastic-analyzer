@@ -31,9 +31,9 @@ export default async function CompetitionPage({
         <div className="ml-auto flex items-center gap-3">
           {user ? (
             <>
-              <span className="text-sm opacity-60">{user.email}</span>
+              <span className="text-sm opacity-60 hidden sm:inline">{user.email}</span>
               <form action="/api/auth/signout" method="POST">
-                <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md">Odhlásit</button>
+                <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-2 rounded-md">Odhlásit</button>
               </form>
             </>
           ) : (

@@ -49,16 +49,16 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#1a3a5c] text-white px-6 h-14 flex items-center gap-3">
         <Link href="/" className="font-black text-lg">Gym<span className="text-[#f6a96e]">Analyze</span></Link>
+        <span className="text-white/40 hidden sm:inline">/</span>
+        <Link href="/gymnasts" className="text-sm opacity-70 hover:opacity-100 hidden sm:inline">Gymnastky</Link>
         <span className="text-white/40">/</span>
-        <Link href="/gymnasts" className="text-sm opacity-70 hover:opacity-100">Gymnastky</Link>
-        <span className="text-white/40">/</span>
-        <span className="text-sm font-medium opacity-80">{gymnast.first_name} {gymnast.last_name}</span>
+        <span className="text-sm font-medium opacity-80 truncate max-w-[140px] sm:max-w-none">{gymnast.first_name} {gymnast.last_name}</span>
         <div className="ml-auto flex items-center gap-3">
           {user ? (
             <>
-              <span className="text-sm opacity-60">{user.email}</span>
+              <span className="text-sm opacity-60 hidden sm:inline">{user.email}</span>
               <form action="/api/auth/signout" method="POST">
-                <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md">Odhlásit</button>
+                <button className="text-sm bg-white/10 hover:bg-white/20 px-3 py-2 rounded-md">Odhlásit</button>
               </form>
             </>
           ) : (
@@ -67,9 +67,9 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Gymnast header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-start flex-wrap gap-4 mb-8">
           <div className="w-16 h-16 rounded-full bg-[#1a3a5c] flex items-center justify-center text-2xl font-black text-white">
             {gymnast.first_name[0]}{gymnast.last_name[0]}
           </div>
@@ -141,7 +141,8 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Historie závodů</h2>
               </div>
-              <table className="w-full">
+              <div className="overflow-x-auto">
+              <table className="w-full whitespace-nowrap">
                 <thead>
                   <tr className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wider">
                     <th className="px-5 py-3 text-left">Soutěž</th>
@@ -182,6 +183,7 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </>
         )}

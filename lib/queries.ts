@@ -24,11 +24,22 @@ export async function getTeamDashboard(): Promise<CompetitionStats[]> {
 
   if (!competitions?.length) return [];
 
-  // Všechny výsledky gymnastek s profilem (gymnast_id IS NOT NULL)
-  const { data: homeResults } = await supabase
+  // Domovská skupina: filtr dle HOME_CLUB_NAME + HOME_BIRTH_YEAR (env)
+  // Fallback: gymnast_id IS NOT NULL (pokud env nejsou nastaveny)
+  const homeClub = process.env.HOME_CLUB_NAME;
+  const homeBirthYear = process.env.HOME_BIRTH_YEAR ? parseInt(process.env.HOME_BIRTH_YEAR, 10) : null;
+
+  let homeQuery = supabase
     .from("results")
-    .select("competition_id, rank, celkem, gymnast_id")
-    .not("gymnast_id", "is", null);
+    .select("competition_id, rank, celkem, gymnast_id");
+
+  if (homeClub && homeBirthYear) {
+    homeQuery = homeQuery.eq("club", homeClub).eq("birth_year", homeBirthYear);
+  } else {
+    homeQuery = homeQuery.not("gymnast_id", "is", null);
+  }
+
+  const { data: homeResults } = await homeQuery;
 
   const resultsMap = new Map<string, { rank: number; celkem: number }[]>();
   for (const r of homeResults ?? []) {

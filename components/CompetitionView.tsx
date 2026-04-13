@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, Fragment } from "react";
 import Link from "next/link";
 import { calcRankings, generateFeedback } from "@/lib/analytics";
 import type { RankedAthlete, Result } from "@/lib/types";
@@ -210,6 +210,8 @@ export default function CompetitionView({ competition, categories, gymnastIds = 
 /* ---- Overview ---- */
 function OverviewView({ athletes, onSelect, gymnastIds = {} }: { athletes: RankedAthlete[]; onSelect: (n: string) => void; gymnastIds?: Record<string, string> }) {
   const avg = athletes.reduce((s, a) => s + a.celkem, 0) / athletes.length;
+  const hasPen = athletes.some(a => a.disciplines.some(d => d.pen > 0));
+
   return (
     <>
       <div className="flex gap-4 mb-6 flex-wrap">
@@ -226,32 +228,62 @@ function OverviewView({ athletes, onSelect, gymnastIds = {} }: { athletes: Ranke
         ))}
       </div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead><tr className="bg-[#1a3a5c] text-white text-xs uppercase tracking-wide">
-            {["#", "Jméno", "Oddíl", "Přeskok", "Bradla", "Kladina", "Prostná", "Celkem"].map(h => (
-              <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {athletes.map(a => (
-              <tr key={a.name} onClick={() => onSelect(a.name)} className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors">
-                <td className="px-4 py-2.5 text-sm font-bold text-gray-500">{medal(a.overallRank)}{a.overallRank}.</td>
-                <td className="px-4 py-2.5 text-sm font-semibold text-gray-800">
-                  {gymnastIds[a.name] ? (
-                    <Link href={`/gymnasts/${gymnastIds[a.name]}`} className="text-[#2563a8] hover:underline" onClick={e => e.stopPropagation()}>
-                      {a.name}
-                    </Link>
-                  ) : a.name}
-                </td>
-                <td className="px-4 py-2.5 text-xs text-gray-400">{a.club || "—"}</td>
-                {a.disciplines.map((d, i) => (
-                  <td key={i} className="px-4 py-2.5 text-sm text-right font-mono">{d.total.toFixed(3)}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs whitespace-nowrap">
+            <thead>
+              <tr className="bg-[#1a3a5c] text-white uppercase tracking-wide">
+                <th className="px-3 py-2 text-left" rowSpan={2}>#</th>
+                <th className="px-3 py-2 text-left" rowSpan={2}>Jméno</th>
+                <th className="px-2 py-2 text-center" rowSpan={2}>Roč.</th>
+                <th className="px-3 py-2 text-left" rowSpan={2}>Oddíl</th>
+                {DISC_NAMES.map(name => (
+                  <th key={name} className="px-2 py-2 text-center border-l border-white/20" colSpan={hasPen ? 4 : 3}>{name}</th>
                 ))}
-                <td className="px-4 py-2.5 text-sm font-black text-[#1a3a5c] text-right">{a.celkem.toFixed(3)}</td>
+                <th className="px-3 py-2 text-right border-l border-white/20" rowSpan={2}>Celkem</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+              <tr className="bg-[#244e7a] text-white/80 text-xs">
+                {DISC_NAMES.map(name => (
+                  <Fragment key={name}>
+                    <th className="px-2 py-1 text-center border-l border-white/20 font-normal">D</th>
+                    <th className="px-2 py-1 text-center font-normal">E</th>
+                    {hasPen && <th className="px-2 py-1 text-center font-normal text-red-300">Pen</th>}
+                    <th className="px-2 py-1 text-center font-semibold">T</th>
+                  </Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {athletes.map(a => (
+                <tr key={a.name} onClick={() => onSelect(a.name)}
+                  className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors">
+                  <td className="px-3 py-2 font-bold text-gray-500">{medal(a.overallRank)}{a.overallRank}.</td>
+                  <td className="px-3 py-2 font-semibold text-gray-800">
+                    {gymnastIds[a.name] ? (
+                      <Link href={`/gymnasts/${gymnastIds[a.name]}`} className="text-[#2563a8] hover:underline" onClick={e => e.stopPropagation()}>
+                        {a.name}
+                      </Link>
+                    ) : a.name}
+                  </td>
+                  <td className="px-2 py-2 text-center text-gray-400">{a.year || "—"}</td>
+                  <td className="px-3 py-2 text-gray-400">{a.club || "—"}</td>
+                  {a.disciplines.map((d, i) => (
+                    <Fragment key={i}>
+                      <td className="px-2 py-2 text-center font-mono border-l border-gray-100 text-gray-600">{d.D.toFixed(3)}</td>
+                      <td className="px-2 py-2 text-center font-mono text-gray-600">{d.E.toFixed(3)}</td>
+                      {hasPen && (
+                        <td className="px-2 py-2 text-center font-mono text-red-500">
+                          {d.pen > 0 ? `-${d.pen.toFixed(3)}` : "—"}
+                        </td>
+                      )}
+                      <td className="px-2 py-2 text-center font-mono font-bold text-gray-800">{d.total.toFixed(3)}</td>
+                    </Fragment>
+                  ))}
+                  <td className="px-3 py-2 text-right font-black text-[#1a3a5c] border-l border-gray-100">{a.celkem.toFixed(3)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </>
   );

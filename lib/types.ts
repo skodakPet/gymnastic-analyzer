@@ -77,6 +77,8 @@ export interface RankedAthlete extends ParsedAthlete {
   total: number;
   discRanks: [number, number, number, number];
   catMaxD: number;
+  id?: string;       // DB result id — for stable React keys and selection
+  isHome?: boolean;  // true if athlete matches HOME_CLUB_NAME + HOME_BIRTH_YEAR
 }
 
 export const DISC_NAMES = ["Přeskok", "Bradla", "Kladina", "Prostná"] as const;

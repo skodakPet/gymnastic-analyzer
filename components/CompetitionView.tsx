@@ -20,6 +20,7 @@ interface Props {
 
 function resultToAthlete(r: Result & { isHome: boolean }) {
   return {
+    id: r.id,
     rank: r.rank, name: r.name, year: r.birth_year ?? 0,
     club: r.club ?? "", coach: r.coach ?? "",
     isHome: r.isHome,
@@ -58,7 +59,7 @@ export default function CompetitionView({ competition, categories, gymnastIds = 
   }, [catData]);
 
   const athlete = useMemo(() =>
-    selectedAthlete ? athletes.find(a => a.name === selectedAthlete) ?? null : null,
+    selectedAthlete ? athletes.find(a => (a.id ?? a.name) === selectedAthlete) ?? null : null,
     [selectedAthlete, athletes]
   );
 
@@ -106,15 +107,13 @@ export default function CompetitionView({ competition, categories, gymnastIds = 
 
 /* ── Category Results Table ─────────────────────────────────────────────────── */
 
-type HomeAthlete = RankedAthlete & { isHome?: boolean };
-
 function CategoryResultsTable({
   athletes,
   onSelect,
   gymnastIds = {},
 }: {
-  athletes: HomeAthlete[];
-  onSelect: (n: string) => void;
+  athletes: RankedAthlete[];
+  onSelect: (id: string) => void;
   gymnastIds?: Record<string, string>;
 }) {
   const avg = athletes.length > 0 ? athletes.reduce((s, a) => s + a.celkem, 0) / athletes.length : 0;
@@ -167,11 +166,11 @@ function CategoryResultsTable({
             </thead>
             <tbody>
               {athletes.map(a => {
-                const isHome = (a as HomeAthlete).isHome;
+                const isHome = a.isHome;
                 return (
                   <tr
-                    key={a.name}
-                    onClick={() => onSelect(a.name)}
+                    key={a.id ?? a.name}
+                    onClick={() => onSelect(a.id ?? a.name)}
                     className={`border-t border-gray-100 cursor-pointer transition-colors ${
                       isHome
                         ? "bg-blue-50 hover:bg-blue-100 border-l-2 border-l-blue-500"
@@ -233,8 +232,8 @@ function AthleteDetail({
   feedback,
   onBack,
 }: {
-  a: HomeAthlete;
-  ranked: HomeAthlete[];
+  a: RankedAthlete;
+  ranked: RankedAthlete[];
   feedback: ReturnType<typeof generateFeedback>;
   onBack: () => void;
 }) {

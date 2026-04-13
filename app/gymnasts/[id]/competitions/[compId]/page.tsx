@@ -11,8 +11,8 @@ function discVal(r: Result, key: string, field: "D" | "E" | "pen" | "total"): nu
 
 function medal(rank: number) { return rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : ""; }
 
-function DeltaCell({ my, ref: refVal }: { my: number; ref: number }) {
-  const delta = my - refVal;
+function DeltaCell({ my, baseline }: { my: number; baseline: number }) {
+  const delta = my - baseline;
   if (Math.abs(delta) < 0.001) return <span className="text-gray-400">—</span>;
   return (
     <span className={delta > 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
@@ -119,13 +119,13 @@ export default async function WhatIfPage({
                     {above && (
                       <td className="px-4 py-3 text-right">
                         <div className="text-xs text-gray-400">{discVal(above, key, "total").toFixed(3)}</div>
-                        <DeltaCell my={total} ref={discVal(above, key, "total")} />
+                        <DeltaCell my={total} baseline={discVal(above, key, "total")} />
                       </td>
                     )}
                     {third && (
                       <td className="px-4 py-3 text-right">
                         <div className="text-xs text-gray-400">{discVal(third, key, "total").toFixed(3)}</div>
-                        <DeltaCell my={total} ref={discVal(third, key, "total")} />
+                        <DeltaCell my={total} baseline={discVal(third, key, "total")} />
                       </td>
                     )}
                   </tr>
@@ -138,13 +138,13 @@ export default async function WhatIfPage({
                 {above && (
                   <td className="px-4 py-3 text-right">
                     <div className="text-xs text-gray-400">{above.celkem?.toFixed(3)}</div>
-                    <DeltaCell my={myResult.celkem} ref={above.celkem} />
+                    <DeltaCell my={myResult.celkem} baseline={above.celkem} />
                   </td>
                 )}
                 {third && (
                   <td className="px-4 py-3 text-right">
                     <div className="text-xs text-gray-400">{third.celkem?.toFixed(3)}</div>
-                    <DeltaCell my={myResult.celkem} ref={third.celkem} />
+                    <DeltaCell my={myResult.celkem} baseline={third.celkem} />
                   </td>
                 )}
               </tr>

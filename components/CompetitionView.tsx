@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
-import { calcRankings, generateFeedback } from "@/lib/analytics";
+import { calcRankings, generateFeedback, isAbsent } from "@/lib/analytics";
 import { SCORE_EPSILON, HYPO_GAIN, RANK_PILL } from "@/lib/analytics.constants";
 import type { Discipline, RankedAthlete, Result } from "@/lib/types";
 import { DISC_NAMES } from "@/lib/types";
@@ -242,7 +242,10 @@ function AthleteDetail({
   onBack: () => void;
 }) {
   const maxD = a.catMaxD;
-  const hypoGain = a.disciplines.reduce((s, d) => s + (maxD - d.D), 0);
+  const hypoGain = a.disciplines.reduce((s, d, i) => {
+    if (isAbsent(d)) return s;
+    return s + (maxD[i] - d.D);
+  }, 0);
   const hypoTotal = a.celkem + hypoGain;
   const hypoRank = ranked.filter(x => x.celkem > hypoTotal).length + 1;
   const discBorders = ["border-l-blue-500", "border-l-purple-500", "border-l-amber-500", "border-l-emerald-500"];
@@ -272,7 +275,7 @@ function AthleteDetail({
       {/* Hypothetical */}
       {hypoGain > HYPO_GAIN.SHOW_BANNER ? (
         <div className="bg-gradient-to-r from-[#1a3a5c] to-[#2563a8] text-white rounded-2xl p-5 mb-5">
-          <p className="text-xs opacity-70 uppercase tracking-wider mb-2">💡 Simulace — plná obtížnost D={maxD.toFixed(3)} ve všech disciplínách</p>
+          <p className="text-xs opacity-70 uppercase tracking-wider mb-2">💡 Simulace — maximální obtížnost D v každé disciplíně</p>
           <div className="flex items-center gap-4 flex-wrap">
             <span className="text-3xl font-black">{hypoTotal.toFixed(3)} b.</span>
             <span className="text-white/60">→</span>
@@ -285,17 +288,28 @@ function AthleteDetail({
         </div>
       ) : (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-5 text-green-800 text-sm font-semibold">
-          ✅ Závodník cvičí s maximální obtížností D={maxD.toFixed(3)} ve všech disciplínách!
+          ✅ Závodník cvičí s maximální obtížností D v každé absolvované disciplíně!
         </div>
       )}
 
       {/* Disciplines */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
         {a.disciplines.map((d, i) => {
+          if (isAbsent(d)) {
+            return (
+              <div key={i} className="bg-gray-50 rounded-xl border border-gray-200 border-l-4 border-l-gray-300 p-4 opacity-70">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-gray-500">{DISC_NAMES[i]}</h3>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">N/A</span>
+                </div>
+                <p className="text-sm text-gray-400 italic">Závodnice tuto disciplínu neabsolvovala</p>
+              </div>
+            );
+          }
           const allE = ranked.map(x => x.disciplines[i].E);
           const avgE = allE.reduce((s, v) => s + v, 0) / allE.length;
           const maxE = Math.max(...allE);
-          const dGap = maxD - d.D;
+          const dGap = maxD[i] - d.D;
           return (
             <div key={i} className={`bg-white rounded-xl border border-gray-200 border-l-4 ${discBorders[i]} p-4`}>
               <div className="flex items-center justify-between mb-3">
@@ -319,8 +333,8 @@ function AthleteDetail({
               {d.pen > 0 && <p className="text-xs text-red-600 mb-2">⚠ Srážka: -{d.pen.toFixed(3)}</p>}
               {dGap > SCORE_EPSILON && (
                 <div>
-                  <div className="flex justify-between text-xs text-gray-400 mb-1"><span>Obtížnost vs. max</span><span>{d.D.toFixed(3)} / {maxD.toFixed(3)}</span></div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-amber-400 rounded-full" style={{ width: `${(d.D / maxD * 100).toFixed(0)}%` }} /></div>
+                  <div className="flex justify-between text-xs text-gray-400 mb-1"><span>Obtížnost vs. max</span><span>{d.D.toFixed(3)} / {maxD[i].toFixed(3)}</span></div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-amber-400 rounded-full" style={{ width: `${maxD[i] > 0 ? (d.D / maxD[i] * 100).toFixed(0) : 0}%` }} /></div>
                 </div>
               )}
               <div className="mt-2">
@@ -365,8 +379,16 @@ function AthleteDetail({
           </tr></thead>
           <tbody>
             {a.disciplines.map((d, i) => {
-              const dGap = maxD - d.D;
-              const hypo = d.E + maxD;
+              if (isAbsent(d)) {
+                return (
+                  <tr key={i} className="border-t border-gray-100 text-gray-400">
+                    <td className="px-4 py-2.5 font-semibold">{DISC_NAMES[i]}</td>
+                    <td colSpan={5} className="px-4 py-2.5 italic text-xs">N/A — neabsolvováno</td>
+                  </tr>
+                );
+              }
+              const dGap = maxD[i] - d.D;
+              const hypo = d.E + maxD[i];
               const allDisc = ranked.map(x => x.disciplines[i].total).sort((a, b) => b - a);
               const hypoR = allDisc.filter(s => s > hypo).length + 1;
               return (

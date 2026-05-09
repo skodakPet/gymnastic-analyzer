@@ -1,5 +1,11 @@
 import type { ParsedAthlete, RankedAthlete, Discipline } from "./types";
 import { DISC_NAMES } from "./types";
+
+// D=E=total=0 typicky znamená, že závodnice disciplínu neabsolvovala
+// (chybí v PDF nebo VSx kategorie kde se nesoutěží na všech 4 nářadích).
+export function isAbsent(d: Discipline): boolean {
+  return d.D === 0 && d.E === 0 && d.total === 0;
+}
 import {
   SCORE_EPSILON,
   D_GAP,
@@ -11,7 +17,12 @@ import {
 
 export function calcRankings(athletes: ParsedAthlete[]): RankedAthlete[] {
   const n = athletes.length;
-  const catMaxD = Math.max(...athletes.flatMap((a) => a.disciplines.map((d) => d.D)));
+  // Per-disciplína max D — D škály se mezi přeskokem/bradly/kladinou/prostnou liší.
+  // D = 0 typicky znamená neúčast (chybějící disciplína v PDF), filtrujeme.
+  const catMaxD = ([0, 1, 2, 3] as const).map((i) => {
+    const ds = athletes.map((a) => a.disciplines[i].D).filter((d) => d > 0);
+    return ds.length > 0 ? Math.max(...ds) : 0;
+  }) as [number, number, number, number];
 
   return athletes.map((a) => {
     const discRanks = a.disciplines.map((d, di) => {
@@ -38,10 +49,11 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
   const maxD = a.catMaxD;
 
   a.disciplines.forEach((d, i) => {
+    if (isAbsent(d)) return;
+
     const allE = all.map((x) => x.disciplines[i].E);
     const avgE = allE.reduce((s, v) => s + v, 0) / n;
-    const maxE = Math.max(...allE);
-    const dGap = maxD - d.D;
+    const dGap = maxD[i] - d.D;
 
     if (dGap > SCORE_EPSILON) {
       items.push({
@@ -49,7 +61,7 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
         icon: dGap >= D_GAP.HIGH_PRIORITY ? "🔴" : "🟡",
         disc: DISC_NAMES[i],
         type: "Obtížnost",
-        text: `D=${d.D.toFixed(3)} oproti max. kategorie ${maxD.toFixed(3)}. Zvýšení na D=${maxD.toFixed(3)} přinese okamžitý zisk +${dGap.toFixed(3)} b.`,
+        text: `D=${d.D.toFixed(3)} oproti max. kategorie ${maxD[i].toFixed(3)}. Zvýšení na D=${maxD[i].toFixed(3)} přinese okamžitý zisk +${dGap.toFixed(3)} b.`,
       });
     }
 
@@ -93,7 +105,10 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
     }
   });
 
-  const hypoGain = a.disciplines.reduce((s, d) => s + (maxD - d.D), 0);
+  const hypoGain = a.disciplines.reduce((s, d, i) => {
+    if (isAbsent(d)) return s;
+    return s + (maxD[i] - d.D);
+  }, 0);
   if (hypoGain > HYPO_GAIN.GENERATE_FEEDBACK) {
     const newTotal = a.celkem + hypoGain;
     const hypoRank = all.filter((x) => x.celkem > newTotal).length + 1;
@@ -102,7 +117,7 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
       icon: "📈",
       disc: "Potenciál",
       type: "Simulace plné D",
-      text: `S D=${maxD.toFixed(3)} ve všech disciplínách: ${newTotal.toFixed(3)} b. → ${hypoRank}. místo (posun o ${a.overallRank - hypoRank} míst).`,
+      text: `S maximální D v každé disciplíně: ${newTotal.toFixed(3)} b. → ${hypoRank}. místo (posun o ${a.overallRank - hypoRank} míst).`,
     });
   }
 
@@ -117,6 +132,6 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
   return items.sort((a, b) => order[a.priority] - order[b.priority]);
 }
 
-export function hypoTotal(a: ParsedAthlete, maxD: number): number {
-  return a.disciplines.reduce((s, d) => s + Math.max(d.total, d.E + maxD - d.pen), 0);
+export function hypoTotal(a: ParsedAthlete, maxD: [number, number, number, number]): number {
+  return a.disciplines.reduce((s, d, i) => s + Math.max(d.total, d.E + maxD[i] - d.pen), 0);
 }

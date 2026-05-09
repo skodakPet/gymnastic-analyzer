@@ -1,5 +1,13 @@
 import type { ParsedAthlete, RankedAthlete, Discipline } from "./types";
 import { DISC_NAMES } from "./types";
+import {
+  SCORE_EPSILON,
+  D_GAP,
+  E_GAP,
+  TOP_DISC_RANK,
+  HYPO_GAIN,
+  OVERALL_PERCENTILE,
+} from "./analytics.constants";
 
 export function calcRankings(athletes: ParsedAthlete[]): RankedAthlete[] {
   const n = athletes.length;
@@ -35,10 +43,10 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
     const maxE = Math.max(...allE);
     const dGap = maxD - d.D;
 
-    if (dGap > 0.001) {
+    if (dGap > SCORE_EPSILON) {
       items.push({
-        priority: dGap >= 0.5 ? "high" : "medium",
-        icon: dGap >= 0.5 ? "🔴" : "🟡",
+        priority: dGap >= D_GAP.HIGH_PRIORITY ? "high" : "medium",
+        icon: dGap >= D_GAP.HIGH_PRIORITY ? "🔴" : "🟡",
         disc: DISC_NAMES[i],
         type: "Obtížnost",
         text: `D=${d.D.toFixed(3)} oproti max. kategorie ${maxD.toFixed(3)}. Zvýšení na D=${maxD.toFixed(3)} přinese okamžitý zisk +${dGap.toFixed(3)} b.`,
@@ -46,15 +54,15 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
     }
 
     const eGap = d.E - avgE;
-    if (eGap < -0.4) {
+    if (eGap < E_GAP.WEAKNESS) {
       items.push({
-        priority: eGap < -0.8 ? "high" : "medium",
-        icon: eGap < -0.8 ? "🔴" : "🟡",
+        priority: eGap < E_GAP.WEAKNESS_HIGH ? "high" : "medium",
+        icon: eGap < E_GAP.WEAKNESS_HIGH ? "🔴" : "🟡",
         disc: DISC_NAMES[i],
         type: "Provedení",
         text: `E=${d.E.toFixed(3)} je o ${Math.abs(eGap).toFixed(3)} b. pod průměrem (${avgE.toFixed(3)}). Zaměřte se na čistost prvků a stabilitu.`,
       });
-    } else if (eGap > 0.3 && dGap < 0.01) {
+    } else if (eGap > E_GAP.STRENGTH && dGap < D_GAP.TOLERANCE) {
       items.push({
         priority: "good",
         icon: "🟢",
@@ -64,7 +72,7 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
       });
     }
 
-    if (a.discRanks[i] <= 3 && dGap < 0.01) {
+    if (a.discRanks[i] <= TOP_DISC_RANK && dGap < D_GAP.TOLERANCE) {
       items.push({
         priority: "good",
         icon: "🟢",
@@ -86,7 +94,7 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
   });
 
   const hypoGain = a.disciplines.reduce((s, d) => s + (maxD - d.D), 0);
-  if (hypoGain > 0.5) {
+  if (hypoGain > HYPO_GAIN.GENERATE_FEEDBACK) {
     const newTotal = a.celkem + hypoGain;
     const hypoRank = all.filter((x) => x.celkem > newTotal).length + 1;
     items.push({
@@ -99,10 +107,10 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
   }
 
   const pct = a.overallRank / n;
-  if (pct <= 0.1) {
+  if (pct <= OVERALL_PERCENTILE.EXCEPTIONAL) {
     items.unshift({ priority: "good", icon: "🏆", disc: "Celkově", type: "Výjimečný výkon", text: `Top ${Math.round(pct * 100)}% kategorie.` });
-  } else if (pct <= 0.3) {
-    items.unshift({ priority: "good", icon: "⭐", disc: "Celkově", type: "Solidní výkon", text: `Top třetina kategorie. S úpravou obtížnosti je reálný posun do top 15%.` });
+  } else if (pct <= OVERALL_PERCENTILE.SOLID) {
+    items.unshift({ priority: "good", icon: "⭐", disc: "Celkově", type: "Solidní výkon", text: `Top třetina kategorie. S úpravou obtížnosti je reálný posun do top ${OVERALL_PERCENTILE.TARGET_AFTER_D_FIX}%.` });
   }
 
   const order: Record<string, number> = { high: 0, medium: 1, good: 2 };

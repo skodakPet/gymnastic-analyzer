@@ -2,6 +2,7 @@
 import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
 import { calcRankings, generateFeedback } from "@/lib/analytics";
+import { SCORE_EPSILON, HYPO_GAIN, RANK_PILL } from "@/lib/analytics.constants";
 import type { Discipline, RankedAthlete, Result } from "@/lib/types";
 import { DISC_NAMES } from "@/lib/types";
 
@@ -41,8 +42,8 @@ function medal(r: number) { return r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3
 function rankPill(rank: number, total: number) {
   const pct = rank / total;
   if (rank <= 3) return "bg-green-100 text-green-800";
-  if (pct <= 0.25) return "bg-blue-100 text-blue-800";
-  if (pct <= 0.6) return "bg-gray-100 text-gray-700";
+  if (pct <= RANK_PILL.TOP) return "bg-blue-100 text-blue-800";
+  if (pct <= RANK_PILL.MIDDLE) return "bg-gray-100 text-gray-700";
   return "bg-red-100 text-red-700";
 }
 
@@ -269,7 +270,7 @@ function AthleteDetail({
       </div>
 
       {/* Hypothetical */}
-      {hypoGain > 0.005 ? (
+      {hypoGain > HYPO_GAIN.SHOW_BANNER ? (
         <div className="bg-gradient-to-r from-[#1a3a5c] to-[#2563a8] text-white rounded-2xl p-5 mb-5">
           <p className="text-xs opacity-70 uppercase tracking-wider mb-2">💡 Simulace — plná obtížnost D={maxD.toFixed(3)} ve všech disciplínách</p>
           <div className="flex items-center gap-4 flex-wrap">
@@ -305,7 +306,7 @@ function AthleteDetail({
               </div>
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {[
-                  { label: "D", value: d.D.toFixed(3), warn: dGap > 0.001 },
+                  { label: "D", value: d.D.toFixed(3), warn: dGap > SCORE_EPSILON },
                   { label: "E", value: d.E.toFixed(3), warn: false },
                   { label: "Celkem", value: d.total.toFixed(3), bold: true },
                 ].map(s => (
@@ -316,7 +317,7 @@ function AthleteDetail({
                 ))}
               </div>
               {d.pen > 0 && <p className="text-xs text-red-600 mb-2">⚠ Srážka: -{d.pen.toFixed(3)}</p>}
-              {dGap > 0.001 && (
+              {dGap > SCORE_EPSILON && (
                 <div>
                   <div className="flex justify-between text-xs text-gray-400 mb-1"><span>Obtížnost vs. max</span><span>{d.D.toFixed(3)} / {maxD.toFixed(3)}</span></div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-amber-400 rounded-full" style={{ width: `${(d.D / maxD * 100).toFixed(0)}%` }} /></div>
@@ -371,11 +372,11 @@ function AthleteDetail({
               return (
                 <tr key={i} className="border-t border-gray-100">
                   <td className="px-4 py-2.5 font-semibold">{DISC_NAMES[i]}</td>
-                  <td className="px-4 py-2.5 font-mono">{d.D.toFixed(3)}{dGap > 0.001 ? <span className="text-red-500 text-xs ml-1">(−{dGap.toFixed(3)})</span> : <span className="text-green-500 ml-1">✓</span>}</td>
+                  <td className="px-4 py-2.5 font-mono">{d.D.toFixed(3)}{dGap > SCORE_EPSILON ? <span className="text-red-500 text-xs ml-1">(−{dGap.toFixed(3)})</span> : <span className="text-green-500 ml-1">✓</span>}</td>
                   <td className="px-4 py-2.5 font-mono">{d.E.toFixed(3)}</td>
                   <td className="px-4 py-2.5 font-bold font-mono">{d.total.toFixed(3)}</td>
                   <td className="px-4 py-2.5"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${rankPill(a.discRanks[i], a.total)}`}>{a.discRanks[i]}. / {a.total}</span></td>
-                  <td className="px-4 py-2.5 text-blue-600">{dGap > 0.001 ? <>{hypo.toFixed(3)} → <strong>{hypoR}. místo</strong></> : "—"}</td>
+                  <td className="px-4 py-2.5 text-blue-600">{dGap > SCORE_EPSILON ? <>{hypo.toFixed(3)} → <strong>{hypoR}. místo</strong></> : "—"}</td>
                 </tr>
               );
             })}
@@ -384,7 +385,7 @@ function AthleteDetail({
               <td colSpan={2}></td>
               <td className="px-4 py-3 font-black text-lg text-[#1a3a5c]">{a.celkem.toFixed(3)}</td>
               <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${rankPill(a.overallRank, a.total)}`}>{a.overallRank}. / {a.total}</span></td>
-              <td className="px-4 py-3 text-blue-700 font-bold">{hypoGain > 0.01 ? `${hypoTotal.toFixed(3)} → ${hypoRank}. místo` : "—"}</td>
+              <td className="px-4 py-3 text-blue-700 font-bold">{hypoGain > HYPO_GAIN.SHOW_TABLE ? `${hypoTotal.toFixed(3)} → ${hypoRank}. místo` : "—"}</td>
             </tr>
           </tbody>
         </table>

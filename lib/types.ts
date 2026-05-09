@@ -77,6 +77,7 @@ export interface RankedAthlete extends ParsedAthlete {
   total: number;
   discRanks: [number, number, number, number];
   catMaxD: [number, number, number, number];
+  catMaxTotal: [number, number, number, number];
   id?: string;       // DB result id — for stable React keys and selection
   isHome?: boolean;  // true if athlete matches HOME_CLUB_NAME + HOME_BIRTH_YEAR
 }

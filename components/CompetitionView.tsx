@@ -242,9 +242,11 @@ function AthleteDetail({
   onBack: () => void;
 }) {
   const maxD = a.catMaxD;
+  const maxTotal = a.catMaxTotal;
+  // Simulace: nejlepší dosažitelný total v každé absolvované disciplíně.
   const hypoGain = a.disciplines.reduce((s, d, i) => {
     if (isAbsent(d)) return s;
-    return s + (maxD[i] - d.D);
+    return s + Math.max(0, maxTotal[i] - d.total);
   }, 0);
   const hypoTotal = a.celkem + hypoGain;
   const hypoRank = ranked.filter(x => x.celkem > hypoTotal).length + 1;
@@ -275,7 +277,7 @@ function AthleteDetail({
       {/* Hypothetical */}
       {hypoGain > HYPO_GAIN.SHOW_BANNER ? (
         <div className="bg-gradient-to-r from-[#1a3a5c] to-[#2563a8] text-white rounded-2xl p-5 mb-5">
-          <p className="text-xs opacity-70 uppercase tracking-wider mb-2">💡 Simulace — maximální obtížnost D v každé disciplíně</p>
+          <p className="text-xs opacity-70 uppercase tracking-wider mb-2">💡 Simulace — nejlepší výsledek kategorie v každé disciplíně</p>
           <div className="flex items-center gap-4 flex-wrap">
             <span className="text-3xl font-black">{hypoTotal.toFixed(3)} b.</span>
             <span className="text-white/60">→</span>
@@ -288,7 +290,7 @@ function AthleteDetail({
         </div>
       ) : (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-5 text-green-800 text-sm font-semibold">
-          ✅ Závodník cvičí s maximální obtížností D v každé absolvované disciplíně!
+          ✅ Závodník má nejlepší výsledek kategorie v každé absolvované disciplíně!
         </div>
       )}
 
@@ -375,7 +377,7 @@ function AthleteDetail({
         <div className="overflow-x-auto">
         <table className="w-full text-sm whitespace-nowrap">
           <thead><tr className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wide border-b border-gray-200">
-            {["Disciplína", "D", "E", "Celkem", "Pořadí", "Hypo (D max)"].map(h => <th key={h} className="px-4 py-3 text-left">{h}</th>)}
+            {["Disciplína", "D", "E", "Celkem", "Pořadí", "Max kategorie"].map(h => <th key={h} className="px-4 py-3 text-left">{h}</th>)}
           </tr></thead>
           <tbody>
             {a.disciplines.map((d, i) => {
@@ -388,9 +390,7 @@ function AthleteDetail({
                 );
               }
               const dGap = maxD[i] - d.D;
-              const hypo = d.E + maxD[i];
-              const allDisc = ranked.map(x => x.disciplines[i].total).sort((a, b) => b - a);
-              const hypoR = allDisc.filter(s => s > hypo).length + 1;
+              const totalGap = maxTotal[i] - d.total;
               return (
                 <tr key={i} className="border-t border-gray-100">
                   <td className="px-4 py-2.5 font-semibold">{DISC_NAMES[i]}</td>
@@ -398,7 +398,7 @@ function AthleteDetail({
                   <td className="px-4 py-2.5 font-mono">{d.E.toFixed(3)}</td>
                   <td className="px-4 py-2.5 font-bold font-mono">{d.total.toFixed(3)}</td>
                   <td className="px-4 py-2.5"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${rankPill(a.discRanks[i], a.total)}`}>{a.discRanks[i]}. / {a.total}</span></td>
-                  <td className="px-4 py-2.5 text-blue-600">{dGap > SCORE_EPSILON ? <>{hypo.toFixed(3)} → <strong>{hypoR}. místo</strong></> : "—"}</td>
+                  <td className="px-4 py-2.5 text-blue-600 font-mono">{maxTotal[i].toFixed(3)}{totalGap > SCORE_EPSILON ? <span className="text-xs ml-1 text-gray-400">(+{totalGap.toFixed(3)})</span> : <span className="text-green-500 ml-1">✓</span>}</td>
                 </tr>
               );
             })}

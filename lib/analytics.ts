@@ -17,11 +17,16 @@ import {
 
 export function calcRankings(athletes: ParsedAthlete[]): RankedAthlete[] {
   const n = athletes.length;
-  // Per-disciplína max D — D škály se mezi přeskokem/bradly/kladinou/prostnou liší.
-  // D = 0 typicky znamená neúčast (chybějící disciplína v PDF), filtrujeme.
+  // Per-disciplína max D a max total. D škály se mezi disciplínami liší a 0
+  // znamená typicky neúčast (chybí v PDF) — filtrujeme.
   const catMaxD = ([0, 1, 2, 3] as const).map((i) => {
     const ds = athletes.map((a) => a.disciplines[i].D).filter((d) => d > 0);
     return ds.length > 0 ? Math.max(...ds) : 0;
+  }) as [number, number, number, number];
+
+  const catMaxTotal = ([0, 1, 2, 3] as const).map((i) => {
+    const ts = athletes.map((a) => a.disciplines[i].total).filter((t) => t > 0);
+    return ts.length > 0 ? Math.max(...ts) : 0;
   }) as [number, number, number, number];
 
   return athletes.map((a) => {
@@ -31,7 +36,7 @@ export function calcRankings(athletes: ParsedAthlete[]): RankedAthlete[] {
     }) as [number, number, number, number];
 
     const overallRank = athletes.filter((x) => x.celkem > a.celkem).length + 1;
-    return { ...a, discRanks, overallRank, total: n, catMaxD };
+    return { ...a, discRanks, overallRank, total: n, catMaxD, catMaxTotal };
   });
 }
 
@@ -105,9 +110,12 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
     }
   });
 
+  // Simulace: kdyby závodnice měla v každé absolvované disciplíně nejlepší
+  // celkový výsledek z kategorie (D + E − pen).
+  const maxTotal = a.catMaxTotal;
   const hypoGain = a.disciplines.reduce((s, d, i) => {
     if (isAbsent(d)) return s;
-    return s + (maxD[i] - d.D);
+    return s + Math.max(0, maxTotal[i] - d.total);
   }, 0);
   if (hypoGain > HYPO_GAIN.GENERATE_FEEDBACK) {
     const newTotal = a.celkem + hypoGain;
@@ -116,8 +124,8 @@ export function generateFeedback(a: RankedAthlete, all: RankedAthlete[]): Feedba
       priority: "medium",
       icon: "📈",
       disc: "Potenciál",
-      type: "Simulace plné D",
-      text: `S maximální D v každé disciplíně: ${newTotal.toFixed(3)} b. → ${hypoRank}. místo (posun o ${a.overallRank - hypoRank} míst).`,
+      type: "Simulace nejlepšího výkonu",
+      text: `S nejlepším výsledkem kategorie v každé disciplíně: ${newTotal.toFixed(3)} b. → ${hypoRank}. místo (posun o ${a.overallRank - hypoRank} míst).`,
     });
   }
 

@@ -34,6 +34,18 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
   });
   const topDiscIdx = discAvgs.indexOf(Math.max(...discAvgs));
 
+  // Nejlepší výsledek per nářadí (kde padl rekord)
+  const discBests = DISC_KEYS.map(key => {
+    const valid = results.filter(r => discTotal(r, key) > 0);
+    if (valid.length === 0) return null;
+    const best = valid.reduce((b, r) => discTotal(r, key) > discTotal(b, key) ? r : b);
+    return {
+      value: discTotal(best, key),
+      competition: best.competitions?.name ?? null,
+      date: best.competitions?.date ?? null,
+    };
+  });
+
   // Chart data
   const chartData = results
     .filter(r => r.competitions?.date && r.celkem > 0)
@@ -115,15 +127,30 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
             <div className="bg-white rounded-xl border border-gray-200 p-5 mb-8">
               <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Průměry na nářadích</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {DISC_NAMES.map((name, i) => (
-                  <div key={name} className={`rounded-lg p-3 text-center ${i === topDiscIdx ? "bg-orange-50 border-2 border-orange-200" : "bg-gray-50"}`}>
-                    <p className="text-xs text-gray-500 mb-1">{name}</p>
-                    <p className={`text-xl font-black ${i === topDiscIdx ? "text-[#e85d26]" : "text-[#1a3a5c]"}`}>
-                      {discAvgs[i] > 0 ? discAvgs[i].toFixed(3) : "—"}
-                    </p>
-                    {i === topDiscIdx && <p className="text-xs text-orange-500 mt-0.5">★ top</p>}
-                  </div>
-                ))}
+                {DISC_NAMES.map((name, i) => {
+                  const best = discBests[i];
+                  return (
+                    <div key={name} className={`rounded-lg p-3 ${i === topDiscIdx ? "bg-orange-50 border-2 border-orange-200" : "bg-gray-50"}`}>
+                      <p className="text-xs text-gray-500 mb-1 text-center">{name}</p>
+                      <p className={`text-xl font-black text-center ${i === topDiscIdx ? "text-[#e85d26]" : "text-[#1a3a5c]"}`}>
+                        {discAvgs[i] > 0 ? discAvgs[i].toFixed(3) : "—"}
+                      </p>
+                      <p className="text-[10px] text-gray-400 text-center uppercase tracking-wide">⌀ průměr</p>
+                      {i === topDiscIdx && <p className="text-xs text-orange-500 mt-0.5 text-center">★ top</p>}
+                      {best && (
+                        <div className="mt-2 pt-2 border-t border-gray-200/70">
+                          <p className="text-sm font-bold text-center text-[#1a3a5c]">{best.value.toFixed(3)}</p>
+                          <p className="text-[10px] text-gray-400 text-center uppercase tracking-wide">rekord</p>
+                          {best.competition && (
+                            <p className="text-[11px] text-gray-500 mt-1 text-center line-clamp-2" title={best.competition}>
+                              {best.competition}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

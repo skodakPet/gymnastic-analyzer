@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getGymnastProfile } from "@/lib/queries";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import PerformanceChart from "@/components/PerformanceChart";
+import GymnastPerformanceChart from "@/components/GymnastPerformanceChart";
 import { DISC_NAMES, DISC_KEYS } from "@/lib/types";
 import type { ResultWithCompetition } from "@/lib/types";
 
@@ -46,16 +46,43 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
     };
   });
 
-  // Chart data
-  const chartData = results
-    .filter(r => r.competitions?.date && r.celkem > 0)
-    .map(r => ({
-      label: r.competitions.name.length > 18
-        ? r.competitions.name.substring(0, 16) + "…"
-        : r.competitions.name,
-      date: r.competitions.date,
-      value: r.celkem,
-    }));
+  // Chart series — graf nesmí být zkreslen závody, kde se necvičila
+  // všechna 4 nářadí. "Víceboj" zahrnuje jen závody se všemi 4 disciplínami,
+  // ostatní taby kreslí trend per nářadí.
+  const shortLabel = (name: string) =>
+    name.length > 18 ? name.substring(0, 16) + "…" : name;
+
+  const allAroundSeries = {
+    key: "viceboj",
+    name: "Víceboj",
+    data: results
+      .filter(r =>
+        r.competitions?.date &&
+        DISC_KEYS.every(k => discTotal(r, k) > 0)
+      )
+      .map(r => ({
+        label: shortLabel(r.competitions.name),
+        date: r.competitions.date,
+        value: r.celkem,
+      })),
+  };
+
+  const perApparatusSeries = DISC_KEYS.map((key, i) => ({
+    key,
+    name: DISC_NAMES[i],
+    data: results
+      .filter(r => r.competitions?.date && discTotal(r, key) > 0)
+      .map(r => ({
+        label: shortLabel(r.competitions.name),
+        date: r.competitions.date,
+        value: discTotal(r, key),
+      })),
+  }));
+
+  const chartSeries = [allAroundSeries, ...perApparatusSeries];
+  // Default tab: víceboj, pokud existuje aspoň 1 takový závod, jinak top nářadí.
+  const defaultChartIdx = allAroundSeries.data.length > 0 ? 0 : 1 + topDiscIdx;
+  const hasChartData = chartSeries.some(s => s.data.length > 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -155,11 +182,11 @@ export default async function GymnastProfilePage({ params }: { params: Promise<{
             </div>
 
             {/* Performance chart */}
-            {chartData.length > 0 && (
+            {hasChartData && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 mb-8">
                 <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Vývoj výkonnosti</h2>
-                <PerformanceChart data={chartData} />
-                <p className="text-xs text-gray-400 mt-2 text-center">Oranžová přerušovaná = průměr</p>
+                <GymnastPerformanceChart series={chartSeries} defaultIdx={defaultChartIdx} />
+                <p className="text-xs text-gray-400 mt-2 text-center">Trend per nářadí · oranžová přerušovaná = průměr</p>
               </div>
             )}
 
